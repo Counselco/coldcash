@@ -41,6 +41,10 @@ jobs:
         with:
           version: nightly
 
+      - name: Install forge-std
+        working-directory: packages/contracts
+        run: forge install foundry-rs/forge-std --no-git
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
