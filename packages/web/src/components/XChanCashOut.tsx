@@ -1,8 +1,38 @@
 'use client';
 
-export function XChanCashOut() {
+import { useState, useEffect } from 'react';
+import { XChanClient } from '@coldcash/shared';
+
+interface XChanCashOutProps {
+  kxAmount?: number;
+}
+
+export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
   const xchanUrl = process.env.NEXT_PUBLIC_XCHAN_URL;
   const isDev = process.env.NODE_ENV === 'development';
+  const [quote, setQuote] = useState<{ usdc: number; rate: number; asOf: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!kxAmount || kxAmount <= 0) return;
+
+    const fetchQuote = async () => {
+      setLoading(true);
+      try {
+        const client = new XChanClient();
+        const result = await client.quoteKxToUsdc(kxAmount);
+        if (result) {
+          setQuote({ usdc: result.usdc, rate: result.rate, asOf: result.asOf });
+        }
+      } catch (error) {
+        console.error('Failed to fetch XChan quote:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchQuote();
+  }, [kxAmount]);
 
   // Production: render nothing if URL not configured
   if (!xchanUrl) {
@@ -42,6 +72,36 @@ export function XChanCashOut() {
       }}
     >
       <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Cash out KX → USDC via XChan</h3>
+
+      {kxAmount && kxAmount > 0 && (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: '#f0f9ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '6px',
+          }}
+        >
+          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
+            {kxAmount.toLocaleString()} KX
+          </div>
+          {loading ? (
+            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#999' }}>
+              Loading quote...
+            </div>
+          ) : quote ? (
+            <>
+              <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0369a1' }}>
+                ≈ ${quote.usdc.toFixed(2)} USDC
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                Rate: 1 KX = ${quote.rate.toFixed(5)} • {new Date(quote.asOf).toLocaleTimeString()}
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
 
       <p style={{ fontSize: '0.95rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
         Promises on ColdCash settle natively in KX. XChan converts KX to USDC <strong>on the Base network</strong>.

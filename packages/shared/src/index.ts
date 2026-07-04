@@ -5,3 +5,4 @@ export * from "./model.js";
 export * from "./dossier.js";
 export * from "./hash.js";
 export * from "./deployments.js";
+export * from "./xchan.js";
