@@ -60,6 +60,29 @@ export interface IntakeRequest {
   isPublic: boolean;
 }
 
-export async function intake(req: IntakeRequest): Promise<unknown> {
-  throw new Error("POST /intake - Not implemented");
+export interface IntakeResponse {
+  frozen: {
+    goal: string;
+    success_criteria: string;
+    evidence_required: string;
+    standardHash: string;
+  };
+  kind: string;
+  isSubjective: boolean;
+  requiresConsent: boolean;
+  spec: unknown;
+}
+
+export async function intake(req: IntakeRequest): Promise<IntakeResponse> {
+  const { IntakeEngine } = await import("../intake/engine.js");
+  const engine = new IntakeEngine();
+  const result = engine.processWish(req);
+
+  return {
+    frozen: result.frozen,
+    kind: result.spec.kind,
+    isSubjective: result.isSubjective,
+    requiresConsent: result.requiresConsent,
+    spec: result.spec,
+  };
 }

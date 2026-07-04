@@ -12,7 +12,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import { ArbitrumUsdcBackend } from "../settlement/ArbitrumUsdcBackend.js";
 import { PromiseFactoryAbi, PromiseEscrowAbi, NamedAttestorAdapterAbi, MockUsdcAbi } from "../settlement/contract-abis.js";
 
-const ANVIL_RPC = "http://127.0.0.1:8545";
+const ANVIL_PORT = process.env.ANVIL_PORT ? parseInt(process.env.ANVIL_PORT) : 8545;
+const ANVIL_RPC = `http://127.0.0.1:${ANVIL_PORT}`;
 const CHAIN_ID = 31337;
 
 const ANVIL_ACCOUNTS = [
@@ -36,7 +37,7 @@ describe("Promise Lifecycle Integration Tests", () => {
   let attestorAddress: Address;
 
   beforeAll(async () => {
-    anvilProcess = spawn(process.env.HOME + "/.foundry/bin/anvil", [], {
+    anvilProcess = spawn(process.env.HOME + "/.foundry/bin/anvil", ["--port", ANVIL_PORT.toString()], {
       stdio: ["ignore", "pipe", "pipe"]
     });
 

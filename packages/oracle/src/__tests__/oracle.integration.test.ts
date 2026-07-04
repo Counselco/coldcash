@@ -19,7 +19,8 @@ import promiseEscrowArtifact from "../../../contracts/out/PromiseEscrow.sol/Prom
 import namedAttestorAdapterArtifact from "../../../contracts/out/NamedAttestorAdapter.sol/NamedAttestorAdapter.json" with { type: "json" };
 import mockUsdcArtifact from "../../../contracts/out/PromiseEscrow.t.sol/MockUSDC.json" with { type: "json" };
 
-const ANVIL_RPC = "http://127.0.0.1:8545";
+const ANVIL_PORT = process.env.ANVIL_PORT ? parseInt(process.env.ANVIL_PORT) : 8546;
+const ANVIL_RPC = `http://127.0.0.1:${ANVIL_PORT}`;
 const CHAIN_ID = 31337;
 
 const ANVIL_ACCOUNTS = [
@@ -51,7 +52,7 @@ describe("Oracle Integration Tests", () => {
     attestorAddress = getAddress(ANVIL_ACCOUNTS[4].address);
     process.env.COLDCASH_ATTESTOR_KEY = attestorKey;
 
-    anvilProcess = spawn(process.env.HOME + "/.foundry/bin/anvil", [], {
+    anvilProcess = spawn(process.env.HOME + "/.foundry/bin/anvil", ["--port", ANVIL_PORT.toString()], {
       stdio: ["ignore", "pipe", "pipe"]
     });
 
