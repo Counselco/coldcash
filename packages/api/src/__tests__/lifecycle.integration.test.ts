@@ -1,0 +1,496 @@
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { spawn, type ChildProcess } from "child_process";
+import {
+  createPublicClient,
+  createWalletClient,
+  http,
+  type Address,
+  type Hex,
+  getAddress
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { ArbitrumUsdcBackend } from "../settlement/ArbitrumUsdcBackend.js";
+import { PromiseFactoryAbi, PromiseEscrowAbi, NamedAttestorAdapterAbi, MockUsdcAbi } from "../settlement/contract-abis.js";
+
+const ANVIL_RPC = "http://127.0.0.1:8545";
+const CHAIN_ID = 31337;
+
+const ANVIL_ACCOUNTS = [
+  { key: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" },
+  { key: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d", address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" },
+  { key: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a", address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC" },
+  { key: "0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6", address: "0x90F79bf6EB2c4f870365E785982E1f101E93b906" },
+  { key: "0x47e179ec197488593b187f80a00eb0da91f1b9d0b13f8733639f19c30a34926a", address: "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65" }
+];
+
+const USDC_BYTECODE = "0x608060405234801561000f575f80fd5b506104718061001d5f395ff3fe608060405234801561000f575f80fd5b5060043610610085575f3560e01c806340c10f191161005857806340c10f191461011757806370a082311461012c578063a9059cbb14610159578063dd62ed3e1461016c575f80fd5b806306fdde0314610089578063095ea7b3146100c757806323b872dd146100ea578063313ce567146100fd575b5f80fd5b6100b1604051806040016040528060098152602001684d6f636b205553444360b81b81525081565b6040516100be91906102e8565b60405180910390f35b6100da6100d536600461034f565b610196565b60405190151581526020016100be565b6100da6100f8366004610377565b6101c3565b610105600681565b60405160ff90911681526020016100be565b61012a61012536600461034f565b61025e565b005b61014b61013a3660046103b0565b5f6020819052908152604090205481565b6040519081526020016100be565b6100da61016736600461034f565b61028e565b61014b61017a3660046103d0565b600160209081525f928352604080842090915290825290205481565b335f9081526001602081815260408084206001600160a01b03871685529091529091208290555b92915050565b6001600160a01b0383165f9081526001602090815260408083203384529091528120805483919083906101f7908490610415565b90915550506001600160a01b0384165f9081526020819052604081208054849290610223908490610415565b90915550506001600160a01b0383165f908152602081905260408120805484929061024f908490610428565b90915550600195945050505050565b6001600160a01b0382165f9081526020819052604081208054839290610285908490610428565b90915550505050565b335f908152602081905260408120805483919083906102ae908490610415565b90915550506001600160a01b0383165f90815260208190526040812080548492906102da908490610428565b909155506001949350505050565b5f602080835283518060208501525f5b81811015610314578581018301518582016040015282016102f8565b505f604082860101526040601f19601f8301168501019250505092915050565b80356001600160a01b038116811461034a575f80fd5b919050565b5f8060408385031215610360575f80fd5b61036983610334565b946020939093013593505050565b5f805f60608486031215610389575f80fd5b61039284610334565b92506103a060208501610334565b9150604084013590509250925092565b5f602082840312156103c0575f80fd5b6103c982610334565b9392505050565b5f80604083850312156103e1575f80fd5b6103ea83610334565b91506103f860208401610334565b90509250929050565b634e487b7160e01b5f52601160045260245ffd5b818103818111156101bd576101bd610401565b808201808211156101bd576101bd61040156fea2646970667358221220da4a9fad72f0715ca5f67b8218f2b4b1c8a476d163bd8338ef097cbec8aad45864736f6c63430008180033";
+const ADAPTER_BYTECODE = "0x60a060405234801561000f575f80fd5b506040516103b23803806103b283398101604081905261002e9161003f565b6001600160a01b031660805261006c565b5f6020828403121561004f575f80fd5b81516001600160a01b0381168114610065575f80fd5b9392505050565b60805161032861008a5f395f81816052015261015301526103285ff3fe608060405234801561000f575f80fd5b5060043610610034575f3560e01c80636170c7e514610038578063cada25c21461004d575b5f80fd5b61004b61004636600461027b565b610090565b005b6100747f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b03909116815260200160405180910390f35b604080514660208201526001600160a01b0388169181019190915261ffff86166060820152608081018590525f9060a00160408051601f198184030181529082905280516020918201207f19457468657265756d205369676e6564204d6573736167653a0a33320000000091830191909152603c820152605c0160408051601f1981840301815282825280516020918201205f845290830180835281905260ff871691830191909152606082018590526080820184905291506001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000169060019060a0016020604051602081039080840390855afa15801561019a573d5f803e3d5ffd5b505050602060405103516001600160a01b0316146101cb57604051635cd5d23360e01b815260040160405180910390fd5b6040805161ffff8816815260208101879052338183015290516001600160a01b038916917ff2806c1620e0b5f43a3fcf85633acb4ae06525fbc2181b68ae71564475d84579919081900360600190a260405163d0bf4ae960e01b815261ffff871660048201526001600160a01b0388169063d0bf4ae9906024015f604051808303815f87803b15801561025c575f80fd5b505af115801561026e573d5f803e3d5ffd5b5050505050505050505050565b5f805f805f8060c08789031215610290575f80fd5b86356001600160a01b03811681146102a6575f80fd5b9550602087013561ffff811681146102bc575f80fd5b945060408701359350606087013560ff811681146102d8575f80fd5b9598949750929560808101359460a090910135935091505056fea2646970667358221220f1a6fd072208fef8d751d86d2ba6dd34c54d7a8a3e8c88dfb2f2b6f47e13192e64736f6c63430008180033";
+const FACTORY_BYTECODE = "0x60c060405234801561000f575f80fd5b5060405161152a38038061152a83398101604081905261002e91610084565b6001600160a01b0392831660805290821660a0525f8054919092166001600160a01b03199182161790915560018054909116331790556100c4565b80516001600160a01b038116811461007f575f80fd5b919050565b5f805f60608486031215610096575f80fd5b61009f84610069565b92506100ad60208501610069565b91506100bb60408501610069565b90509250925092565b60805160a05161142b6100ff5f395f818160d2015261042201525f8181608e01528181610269015281816103330152610451015261142b5ff3fe608060405234801561000f575f80fd5b5060043610610085575f3560e01c80638da5cb5b116100585780638da5cb5b14610122578063c44014d214610135578063c98517c51461014a578063d31c748b14610163575f80fd5b80633e413bee1461008957806346904840146100cd5780636fd33d4a146100f457806380dce16914610110575b5f80fd5b6100b07f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020015b60405180910390f35b6100b07f000000000000000000000000000000000000000000000000000000000000000081565b6100fd61012c81565b60405161ffff90911681526020016100c4565b5f546100b0906001600160a01b031681565b6001546100b0906001600160a01b031681565b610148610143366004610572565b610176565b005b6101556305f5e10081565b6040519081526020016100c4565b6100b06101713660046105a9565b6101c2565b6001546001600160a01b031633146101a1576040516330cd747160e01b815260040160405180910390fd5b5f80546001600160a01b0319166001600160a01b0392909216919091179055565b5f8615806101d357506305f5e10087115b156101f157604051631d3fde9360e31b815260040160405180910390fd5b428667ffffffffffffffff1611158061021e57508567ffffffffffffffff168567ffffffffffffffff1611155b1561023c57604051632ed6c2e160e11b815260040160405180910390fd5b6001600160a01b0383811615905f908416156102585783610264565b5f546001600160a01b03165b9050337f00000000000000000000000000000000000000000000000000000000000000008a8a8a858b8b60405161029a9061054a565b6001600160a01b0398891681529688166020880152604087019590955267ffffffffffffffff9384166060870152929091166080850152841660a084015260c08301529190911660e082015261010001604051809103905ff080158015610303573d5f803e3d5ffd5b506040516323b872dd60e01b81523360048201526001600160a01b038083166024830152604482018c90529194507f0000000000000000000000000000000000000000000000000000000000000000909116906323b872dd906064016020604051808303815f875af115801561037b573d5f803e3d5ffd5b505050506040513d601f19601f8201168201806040525081019061039f919061060b565b6103dd5760405162461bcd60e51b81526004016103d490602080825260049082015263199d5b9960e21b604082015260600190565b60405180910390fd5b81156104ef575f6127106103f361012c8c61062a565b6103fd9190610653565b905080156104ed576040516323b872dd60e01b81523360048201526001600160a01b037f000000000000000000000000000000000000000000000000000000000000000081166024830152604482018390527f000000000000000000000000000000000000000000000000000000000000000016906323b872dd906064016020604051808303815f875af1158015610497573d5f803e3d5ffd5b505050506040513d601f19601f820116820180604052508101906104bb919061060b565b6104ed5760405162461bcd60e51b815260206004820152600360248201526266656560e81b60448201526064016103d4565b505b604080518a8152831515602082015290810187905233906001600160a01b038516907f67840b567aa2889e86847c568d9bef7fc400b288d47cb49958a7c7823e09d5969060600160405180910390a350509695505050505050565b610d838061067383390190565b80356001600160a01b038116811461056d575f80fd5b919050565b5f60208284031215610582575f80fd5b61058b82610557565b9392505050565b803567ffffffffffffffff8116811461056d575f80fd5b5f805f805f8060c087890312156105be575f80fd5b863595506105ce60208801610592565b94506105dc60408801610592565b9350606087013592506105f160808801610557565b91506105ff60a08801610557565b90509295509295509295565b5f6020828403121561061b575f80fd5b8151801515811461058b575f80fd5b808202811582820484141761064d57634e487b7160e01b5f52601160045260245ffd5b92915050565b5f8261066d57634e487b7160e01b5f52601260045260245ffd5b50049056fe610180604052348015610010575f80fd5b50604051610d83380380610d8383398101604081905261002f916100c5565b6001600160a01b0397881660805295871660a05260c0949094526001600160401b0392831660e0529116610100908152908416610120526101409190915291168015610160525f80549190920260ff19166001600160a81b0319909116179055610149565b80516001600160a01b03811681146100aa575f80fd5b919050565b80516001600160401b03811681146100aa575f80fd5b5f805f805f805f80610100898b0312156100dd575f80fd5b6100e689610094565b97506100f460208a01610094565b96506040890151955061010960608a016100af565b945061011760808a016100af565b935061012560a08a01610094565b925060c0890151915061013a60e08a01610094565b90509295985092959890939650565b60805160a05160c05160e05161010051610120516101405161016051610b6961021a5f395f81816101e0015261035401525f61017c01525f81816101b9015261068b01525f818161013c01528181610540015261070101525f818161026a01528181610309015261043d01525f8181610217015281816104970152818161059a0152818161065a0152818161078a015281816107c1015261095901525f81816102b0015261099f01525f818160ee01528181610639015281816108580152818161088d01526109380152610b695ff3fe608060405234801561000f575f80fd5b50600436106100e5575f3560e01c8063aa8c217c11610088578063dd80d5a211610063578063dd80d5a214610265578063ea8a1af01461028c578063f3ab7ea914610294578063fc0c546a146102ab575f80fd5b8063aa8c217c14610212578063c19d93fb14610239578063d0bf4ae914610252575f80fd5b80632b089dc5116100c35780632b089dc514610177578063590e1ae3146101ac5780637dc0d1d0146101b4578063a6cb7234146101db575f80fd5b8063143eef54146100e95780632852b71c1461012d57806329dcb0cf14610137575b5f80fd5b6101107f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b0390911681526020015b60405180910390f35b6101356102d2565b005b61015e7f000000000000000000000000000000000000000000000000000000000000000081565b60405167ffffffffffffffff9091168152602001610124565b61019e7f000000000000000000000000000000000000000000000000000000000000000081565b604051908152602001610124565b61013561041f565b6101107f000000000000000000000000000000000000000000000000000000000000000081565b6102027f000000000000000000000000000000000000000000000000000000000000000081565b6040519015158152602001610124565b61019e7f000000000000000000000000000000000000000000000000000000000000000081565b5f546102459060ff1681565b6040516101249190610a63565b610135610260366004610a89565b610680565b61015e7f000000000000000000000000000000000000000000000000000000000000000081565b610135610882565b5f546101109061010090046001600160a01b031681565b6101107f000000000000000000000000000000000000000000000000000000000000000081565b5f805460ff1660048111156102e9576102e9610a4f565b1461030757604051636f20b45d60e11b815260040160405180910390fd5b7f000000000000000000000000000000000000000000000000000000000000000067ffffffffffffffff164211156103525760405163b6e36ea560e01b815260040160405180910390fd5b7f000000000000000000000000000000000000000000000000000000000000000015610393575f8054610100600160a81b03191633610100021790556103c2565b5f5461010090046001600160a01b031633146103c25760405163ea8e4eb560e01b815260040160405180910390fd5b5f805460ff1916600117908190556040514267ffffffffffffffff1681526101009091046001600160a01b0316907f6daa5705e82ca331c241f2b9574827f7189de6f9ea2de02439c33fb546ac37279060200160405180910390a2565b5f805460ff16600481111561043657610436610a4f565b03610521577f000000000000000000000000000000000000000000000000000000000000000067ffffffffffffffff16421161048557604051632cc8960360e11b815260040160405180910390fd5b5f805460ff19166003179055604080517f00000000000000000000000000000000000000000000000000000000000000008152602081018290526017918101919091527f6f66666572206c617073656420756e616363657074656400000000000000000060608201527fb926d4add59927a4c336c9292b0e2e0bdb4300a883008a4373561e6eef7f6272906080015b60405180910390a1610634565b60015f5460ff16600481111561053957610539610a4f565b0361061b577f000000000000000000000000000000000000000000000000000000000000000067ffffffffffffffff16421161058857604051632cc8960360e11b815260040160405180910390fd5b5f805460ff19166003179055604080517f0000000000000000000000000000000000000000000000000000000000000000815260208101829052601a918101919091527f646561646c696e652070617373656420756e7265736f6c76656400000000000060608201527fb926d4add59927a4c336c9292b0e2e0bdb4300a883008a4373561e6eef7f627290608001610514565b604051636f20b45d60e11b815260040160405180910390fd5b61067e7f00000000000000000000000000000000000000000000000000000000000000007f0000000000000000000000000000000000000000000000000000000000000000610979565b565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146106c95760405163ea8e4eb560e01b815260040160405180910390fd5b60015f5460ff1660048111156106e1576106e1610a4f565b146106ff57604051636f20b45d60e11b815260040160405180910390fd5b7f000000000000000000000000000000000000000000000000000000000000000067ffffffffffffffff1642111561074a576040516381efbd8d60e01b815260040160405180910390fd5b6127108161ffff16111561077157604051636e549e5960e01b815260040160405180910390fd5b5f805460ff191660021781556127106107ae61ffff84167f0000000000000000000000000000000000000000000000000000000000000000610ac5565b6107b89190610ae2565b90505f6107e5827f0000000000000000000000000000000000000000000000000000000000000000610b01565b6040805161ffff86168152602081018590529081018290529091507f72c1428f18075fe03a0db1574d9b1f661e36b77c0fea66fa3981faf9b6c366569060600160405180910390a1811561084d575f5461084d9061010090046001600160a01b031683610979565b801561087d5761087d7f000000000000000000000000000000000000000000000000000000000000000082610979565b505050565b336001600160a01b037f000000000000000000000000000000000000000000000000000000000000000016146108cb5760405163ea8e4eb560e01b815260040160405180910390fd5b5f805460ff1660048111156108e2576108e2610a4f565b1461090057604051636f20b45d60e11b815260040160405180910390fd5b5f805460ff191660041781556040517f1afb0ae590df277bcb3a37f88612725bf1f7df4755792b1548a7efe77985ff779190a161067e7f00000000000000000000000000000000000000000000000000000000000000007f00000000000000000000000000000000000000000000000000000000000000005b60405163a9059cbb60e01b81526001600160a01b038381166004830152602482018390527f0000000000000000000000000000000000000000000000000000000000000000169063a9059cbb906044016020604051808303815f875af11580156109e5573d5f803e3d5ffd5b505050506040513d601f19601f82011682018060405250810190610a099190610b14565b610a4b5760405162461bcd60e51b815260206004820152600f60248201526e1d1c985b9cd9995c8819985a5b1959608a1b604482015260640160405180910390fd5b5050565b634e487b7160e01b5f52602160045260245ffd5b6020810160058310610a8357634e487b7160e01b5f52602160045260245ffd5b91905290565b5f60208284031215610a99575f80fd5b813561ffff81168114610aaa575f80fd5b9392505050565b634e487b7160e01b5f52601160045260245ffd5b8082028115828204841417610adc57610adc610ab1565b92915050565b5f82610afc57634e487b7160e01b5f52601260045260245ffd5b500490565b81810381811115610adc57610adc610ab1565b5f60208284031215610b24575f80fd5b81518015158114610aaa575f80fdfea2646970667358221220e8dba7aa3bff21380a2bce6cc3343ddedcfc76864eafd622737d73d0b124bc8764736f6c63430008180033a2646970667358221220c520f5f14982925448170391f059c69e79140b64535ab625cb8d357be314b33464736f6c63430008180033";
+
+describe("Promise Lifecycle Integration Tests", () => {
+  let anvilProcess: ChildProcess;
+  let usdcAddress: Address;
+  let factoryAddress: Address;
+  let adapterAddress: Address;
+  let attestorKey: Hex;
+  let attestorAddress: Address;
+
+  beforeAll(async () => {
+    anvilProcess = spawn(process.env.HOME + "/.foundry/bin/anvil", [], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: {
+        id: CHAIN_ID,
+        name: "anvil",
+        nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+        rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } }
+      }
+    });
+
+    const deployer = privateKeyToAccount(ANVIL_ACCOUNTS[0].key as Hex);
+    const deployerClient = createWalletClient({
+      account: deployer,
+      transport: http(ANVIL_RPC),
+      chain: {
+        id: CHAIN_ID,
+        name: "anvil",
+        nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+        rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } }
+      }
+    });
+
+    attestorKey = ANVIL_ACCOUNTS[4].key as Hex;
+    attestorAddress = getAddress(ANVIL_ACCOUNTS[4].address);
+
+    const usdcHash = await deployerClient.deployContract({
+      abi: MockUsdcAbi,
+      bytecode: USDC_BYTECODE as Hex,
+      account: deployer
+    });
+
+    const usdcReceipt = await publicClient.waitForTransactionReceipt({ hash: usdcHash });
+    usdcAddress = usdcReceipt.contractAddress!;
+
+    const feeRecipient = ANVIL_ACCOUNTS[3].address as Address;
+
+    const adapterHash = await deployerClient.deployContract({
+      abi: NamedAttestorAdapterAbi,
+      bytecode: ADAPTER_BYTECODE as Hex,
+      args: [attestorAddress],
+      account: deployer
+    });
+
+    const adapterReceipt = await publicClient.waitForTransactionReceipt({ hash: adapterHash });
+    adapterAddress = adapterReceipt.contractAddress!;
+
+    const factoryHash = await deployerClient.deployContract({
+      abi: PromiseFactoryAbi,
+      bytecode: FACTORY_BYTECODE as Hex,
+      args: [usdcAddress, feeRecipient, adapterAddress],
+      account: deployer
+    });
+
+    const factoryReceipt = await publicClient.waitForTransactionReceipt({ hash: factoryHash });
+    factoryAddress = factoryReceipt.contractAddress!;
+
+    const backer = ANVIL_ACCOUNTS[1].address as Address;
+    const mintHash = await deployerClient.writeContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "mint",
+      args: [backer, 1_000_000_000n],
+      account: deployer
+    });
+
+    await publicClient.waitForTransactionReceipt({ hash: mintHash });
+  }, 30000);
+
+  afterAll(() => {
+    if (anvilProcess) {
+      anvilProcess.kill();
+    }
+  });
+
+  it("(a) happy path: fund $100, accept, resolve at 10000 bps, seeker +$100, state Paid", async () => {
+    const backend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[1].key as Hex
+    });
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    const seekerKey = ANVIL_ACCOUNTS[2].key as Hex;
+    const seeker = getAddress(ANVIL_ACCOUNTS[2].address);
+
+    const promiseRef = await backend.createPromise({
+      backer: getAddress(ANVIL_ACCOUNTS[1].address),
+      prize: 100_000_000n,
+      acceptBy: Math.floor(Date.now() / 1000) + 86400,
+      deadline: Math.floor(Date.now() / 1000) + 604800,
+      standardHash: "0x0000000000000000000000000000000000000000000000000000000000000001" as Hex,
+      isPublic: false,
+      namedSeeker: seeker
+    });
+
+    const seekerBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: seekerKey
+    });
+
+    await seekerBackend.accept(promiseRef, seeker);
+
+    const attestorBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: attestorKey
+    });
+
+    await attestorBackend.resolve(promiseRef, 10_000, "0x0000000000000000000000000000000000000000000000000000000000000002" as Hex);
+
+    const seekerBalance = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [seeker]
+    });
+
+    const escrowBalance = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [promiseRef.address]
+    });
+
+    const state = await attestorBackend.status(promiseRef);
+
+    expect(seekerBalance).toBe(100_000_000n);
+    expect(escrowBalance).toBe(0n);
+    expect(state.status).toBe("Paid");
+  }, 30000);
+
+  it("(b) partial credit: resolve at 2000 bps, seeker +$20, backer refunded $80", async () => {
+    const backend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[1].key as Hex
+    });
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    const backer = getAddress(ANVIL_ACCOUNTS[1].address);
+    const seeker = getAddress(ANVIL_ACCOUNTS[2].address);
+    const seekerKey = ANVIL_ACCOUNTS[2].key as Hex;
+
+    const backerBalanceBefore = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const promiseRef = await backend.createPromise({
+      backer,
+      prize: 100_000_000n,
+      acceptBy: Math.floor(Date.now() / 1000) + 86400,
+      deadline: Math.floor(Date.now() / 1000) + 604800,
+      standardHash: "0x0000000000000000000000000000000000000000000000000000000000000003" as Hex,
+      isPublic: false,
+      namedSeeker: seeker
+    });
+
+    const seekerBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: seekerKey
+    });
+
+    await seekerBackend.accept(promiseRef, seeker);
+
+    const attestorBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: attestorKey
+    });
+
+    await attestorBackend.resolve(promiseRef, 2_000, "0x0000000000000000000000000000000000000000000000000000000000000004" as Hex);
+
+    const seekerBalance = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [seeker]
+    });
+
+    const backerBalanceAfter = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    expect(seekerBalance).toBe(120_000_000n);
+    expect(backerBalanceAfter - backerBalanceBefore).toBe(-20_000_000n);
+  }, 30000);
+
+  it("(c) lapse: offer unaccepted past acceptBy, anyone sweeps, backer whole", async () => {
+    const backend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[1].key as Hex
+    });
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    const backer = getAddress(ANVIL_ACCOUNTS[1].address);
+
+    const backerBalanceBefore = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const acceptBy = Math.floor(Date.now() / 1000) + 300;
+    const promiseRef = await backend.createPromise({
+      backer,
+      prize: 100_000_000n,
+      acceptBy,
+      deadline: Math.floor(Date.now() / 1000) + 604800,
+      standardHash: "0x0000000000000000000000000000000000000000000000000000000000000005" as Hex,
+      isPublic: false,
+      namedSeeker: getAddress(ANVIL_ACCOUNTS[2].address)
+    });
+
+    const anvilClient = createWalletClient({
+      account: privateKeyToAccount(ANVIL_ACCOUNTS[0].key as Hex),
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    await anvilClient.request({
+      method: "evm_increaseTime" as any,
+      params: [310] as any
+    });
+
+    await anvilClient.request({
+      method: "evm_mine" as any,
+      params: [] as any
+    });
+
+    const randomBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[3].key as Hex
+    });
+
+    await randomBackend.refund(promiseRef);
+
+    const backerBalanceAfter = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const state = await backend.status(promiseRef);
+
+    expect(backerBalanceAfter).toBe(backerBalanceBefore);
+    expect(state.status).toBe("Refunded");
+  }, 30000);
+
+  it("(d) deadline: accepted but unresolved past deadline, sweep, backer whole", async () => {
+    const backend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[1].key as Hex
+    });
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    const backer = getAddress(ANVIL_ACCOUNTS[1].address);
+    const seeker = getAddress(ANVIL_ACCOUNTS[2].address);
+    const seekerKey = ANVIL_ACCOUNTS[2].key as Hex;
+
+    const backerBalanceBefore = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const acceptBy = Math.floor(Date.now() / 1000) + 3600;
+    const deadline = acceptBy + 3600;
+    const promiseRef = await backend.createPromise({
+      backer,
+      prize: 100_000_000n,
+      acceptBy,
+      deadline,
+      standardHash: "0x0000000000000000000000000000000000000000000000000000000000000006" as Hex,
+      isPublic: false,
+      namedSeeker: seeker
+    });
+
+    const seekerBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: seekerKey
+    });
+
+    await seekerBackend.accept(promiseRef, seeker);
+
+    const anvilClient = createWalletClient({
+      account: privateKeyToAccount(ANVIL_ACCOUNTS[0].key as Hex),
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    await anvilClient.request({
+      method: "evm_increaseTime" as any,
+      params: [7300] as any
+    });
+
+    await anvilClient.request({
+      method: "evm_mine" as any,
+      params: [] as any
+    });
+
+    const randomBackend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[3].key as Hex
+    });
+
+    await randomBackend.refund(promiseRef);
+
+    const backerBalanceAfter = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const state = await backend.status(promiseRef);
+
+    expect(backerBalanceAfter).toBe(backerBalanceBefore);
+    expect(state.status).toBe("Refunded");
+  }, 30000);
+
+  it("(e) public-lane fee: open offer skims 3% to feeRecipient, prize stays whole", async () => {
+    const backend = new ArbitrumUsdcBackend({
+      rpcUrl: ANVIL_RPC,
+      chainId: CHAIN_ID,
+      factoryAddress,
+      usdcAddress,
+      oracleAddress: adapterAddress,
+      signerPrivateKey: ANVIL_ACCOUNTS[1].key as Hex
+    });
+
+    const publicClient = createPublicClient({
+      transport: http(ANVIL_RPC),
+      chain: { id: CHAIN_ID, name: "anvil", nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: [ANVIL_RPC] }, public: { http: [ANVIL_RPC] } } }
+    });
+
+    const backer = getAddress(ANVIL_ACCOUNTS[1].address);
+    const feeRecipient = getAddress(ANVIL_ACCOUNTS[3].address);
+
+    const backerBalanceBefore = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const feeBalanceBefore = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [feeRecipient]
+    }) as bigint;
+
+    const promiseRef = await backend.createPromise({
+      backer,
+      prize: 100_000_000n,
+      acceptBy: Math.floor(Date.now() / 1000) + 86400,
+      deadline: Math.floor(Date.now() / 1000) + 604800,
+      standardHash: "0x0000000000000000000000000000000000000000000000000000000000000007" as Hex,
+      isPublic: true
+    });
+
+    const escrowBalance = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [promiseRef.address]
+    });
+
+    const backerBalanceAfter = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [backer]
+    }) as bigint;
+
+    const feeBalanceAfter = await publicClient.readContract({
+      address: usdcAddress,
+      abi: MockUsdcAbi,
+      functionName: "balanceOf",
+      args: [feeRecipient]
+    }) as bigint;
+
+    expect(escrowBalance).toBe(100_000_000n);
+    expect(backerBalanceBefore - backerBalanceAfter).toBe(103_000_000n);
+    expect(feeBalanceAfter - feeBalanceBefore).toBe(3_000_000n);
+  }, 30000);
+});

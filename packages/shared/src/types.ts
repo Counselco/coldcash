@@ -19,6 +19,7 @@ export interface PromiseParams {
   deadline: number;
   standardHash: Hex;
   isPublic: boolean;
+  namedSeeker?: Address;
 }
 
 export type PromiseStatus = "Offered" | "Canceled" | "Accepted" | "Paid" | "Refunded";

@@ -94,8 +94,22 @@ All required tooling was genuinely absent from the system PATH and required inst
 - **pnpm**: Installed to `~/.local/bin` via `npm install -g pnpm@9 --prefix ~/.local`
   - Version: pnpm 9.15.9
 
+**Permanent PATH fix (applied P1.1, 2026-07-04):**
+
+Symlinks created in `~/.local/bin` (which IS on PATH) pointing to actual binaries:
+```
+~/.local/bin/node -> ~/.local/node20/bin/node
+~/.local/bin/npm -> ~/.local/node20/bin/npm
+~/.local/bin/npx -> ~/.local/node20/bin/npx
+~/.local/bin/forge -> ~/.foundry/bin/forge
+~/.local/bin/cast -> ~/.foundry/bin/cast
+~/.local/bin/anvil -> ~/.foundry/bin/anvil
+```
+
+This allows bare commands (`node --version`, `pnpm --version`, `forge test`, `anvil`) to work without PATH= prefixes, matching the Bash tool allowlist.
+
 **Notes:**
 - `/opt/homebrew/bin` exists on system but was not on PATH and contained no required tools
 - Session PATH did not include standard Homebrew, Foundry, or user-local bin directories
 - All installations are user-local (no sudo required)
-- For Claude Code tasks, ensure PATH includes: `~/.foundry/bin:~/.local/node20/bin:~/.local/bin`
+- Symlinks are overwrite-safe and can be recreated via: `python3 -c "import os; ..."`
