@@ -15,6 +15,14 @@ export interface GitHubMergeSpec {
   deadline: number;
 }
 
+export interface NodeUptimeSpec {
+  kind: "node-uptime";
+  nodeId: string;
+  requiredDays: number;
+  windowDays: number;
+  deadline: number;
+}
+
 export interface ManualAttestationSpec {
   kind: "manual-attestation";
   goal: string;
@@ -23,7 +31,7 @@ export interface ManualAttestationSpec {
   subjectiveConsent: boolean;
 }
 
-export type StandardSpec = GitHubMergeSpec | ManualAttestationSpec;
+export type StandardSpec = GitHubMergeSpec | NodeUptimeSpec | ManualAttestationSpec;
 
 export interface IntakeResult {
   spec: StandardSpec;
@@ -53,6 +61,31 @@ export class IntakeEngine {
         goal: `PR #${spec.prNumber} merged to ${spec.repo}`,
         success_criteria: `Pull request #${spec.prNumber} merged to main branch of ${spec.repo} before Unix timestamp ${spec.deadline}`,
         evidence_required: `GitHub webhook confirming merge event with merge commit SHA`,
+        standardHash: hash,
+      };
+      return {
+        spec,
+        frozen,
+        isSubjective: false,
+        requiresConsent: false,
+      };
+    }
+
+    const nodeUptimeMatch = this.tryParseNodeUptime(input.wish);
+    if (nodeUptimeMatch) {
+      const spec: NodeUptimeSpec = nodeUptimeMatch;
+      const standard = {
+        kind: "node-uptime" as const,
+        nodeId: spec.nodeId,
+        requiredDays: spec.requiredDays,
+        windowDays: spec.windowDays,
+        deadline: spec.deadline,
+      };
+      const hash = standardHash(standard);
+      const frozen: FrozenStandard = {
+        goal: `Node ${spec.nodeId} online ≥${spec.requiredDays} of ${spec.windowDays} days`,
+        success_criteria: `ChronX node ${spec.nodeId} uptime ≥${spec.requiredDays} days within a ${spec.windowDays}-day window, measured at deadline ${spec.deadline}`,
+        evidence_required: `Telemetry data from ChronX node endpoint showing uptime record`,
         standardHash: hash,
       };
       return {
@@ -115,6 +148,48 @@ export class IntakeEngine {
           kind: "github-merge",
           repo,
           prNumber,
+          deadline,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private tryParseNodeUptime(wish: string): NodeUptimeSpec | null {
+    const patterns = [
+      /node\s+([a-z0-9_-]+)\s+(?:online|up|uptime)\s+(\d+)\s+(?:of|\/)\s+(\d+)\s+days/i,
+      /([a-z0-9_-]+)\s+node\s+(\d+)\s+days?\s+uptime/i,
+      /uptime\s+([a-z0-9_-]+)\s+(\d+)\s+days/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = wish.match(pattern);
+      if (match) {
+        let nodeId: string;
+        let requiredDays: number;
+        let windowDays: number;
+
+        if (pattern.source.includes("of|")) {
+          nodeId = match[1];
+          requiredDays = parseInt(match[2]);
+          windowDays = parseInt(match[3]);
+        } else {
+          nodeId = match[1];
+          requiredDays = parseInt(match[2]);
+          windowDays = 30; // default window
+        }
+
+        const deadlineMatch = wish.match(/(?:by|before|deadline)\s+(\d+)/i);
+        const deadline = deadlineMatch
+          ? parseInt(deadlineMatch[1])
+          : Math.floor(Date.now() / 1000) + 604800;
+
+        return {
+          kind: "node-uptime",
+          nodeId,
+          requiredDays,
+          windowDays,
           deadline,
         };
       }

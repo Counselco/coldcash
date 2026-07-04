@@ -19,6 +19,7 @@
     "viem": "^2.17.4"
   },
   "devDependencies": {
+    "@coldcash/oracle": "workspace:*",
     "@electric-sql/pglite": "^0.2.0",
     "@types/node": "^20.14.10",
     "drizzle-kit": "^0.22.8",
