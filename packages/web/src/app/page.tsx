@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { XChanCashOut } from '@/components/XChanCashOut';
 
 export default function Home() {
   return (
@@ -21,6 +22,9 @@ export default function Home() {
           </Link>
         </li>
       </ul>
+
+      <XChanCashOut />
+
       <hr style={{ margin: '2rem 0' }} />
       <p style={{ fontSize: '0.9rem', color: '#666' }}>
         <strong>Demo Mode:</strong> Using anvil dev accounts on localhost:8545
