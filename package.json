@@ -1,0 +1,23 @@
+{
+  "name": "coldcash-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ColdCash: Arbitrum-native commitments with ChronX consensus pluggability",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "forge:test": "cd packages/contracts && forge test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  },
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  }
+}

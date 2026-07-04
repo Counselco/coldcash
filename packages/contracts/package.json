@@ -1,0 +1,11 @@
+{
+  "name": "@coldcash/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ColdCash Solidity contracts (Foundry)",
+  "scripts": {
+    "test": "forge test",
+    "build": "forge build",
+    "typecheck": "echo 'No TypeScript in contracts package'"
+  }
+}
