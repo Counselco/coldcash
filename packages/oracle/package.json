@@ -1,0 +1,25 @@
+{
+  "name": "@coldcash/oracle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ColdCash oracle service with attestation signing and anchor adapters",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coldcash/shared": "workspace:*",
+    "@octokit/rest": "^20.1.1",
+    "viem": "^2.17.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3",
+    "vitest": "^2.0.2"
+  }
+}
