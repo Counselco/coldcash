@@ -2,9 +2,12 @@ import type { Address, Hex } from "viem";
 
 export type { Address, Hex };
 
+export type Asset = "KX" | "USDC-ARB";
+
 export interface PromiseRef {
   chainId: number;
   address: Address;
+  asset?: Asset;
 }
 
 export interface TxRef {
@@ -20,6 +23,7 @@ export interface PromiseParams {
   standardHash: Hex;
   isPublic: boolean;
   namedSeeker?: Address;
+  asset?: Asset;
 }
 
 export type PromiseStatus = "Offered" | "Canceled" | "Accepted" | "Paid" | "Refunded";
@@ -61,4 +65,8 @@ export interface SanitizedClaim {
   evidenceHash: Hex;
   validatorResults: Record<string, unknown>;
   submittedAt: number;
+}
+
+export interface RateProvider {
+  getKxToUsdcRate(): Promise<number | null>;
 }
