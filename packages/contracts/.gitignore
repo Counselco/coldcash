@@ -1,3 +1,8 @@
 out/
 cache/
 lib/
+broadcast/
+
+# Deployment environment files (contain secrets - never commit)
+.env
+.env.*
