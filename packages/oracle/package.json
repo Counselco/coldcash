@@ -6,11 +6,15 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "attest-chronx": "./dist/cli/attest-chronx.js"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "attest-chronx": "node ./dist/cli/attest-chronx.js"
   },
   "dependencies": {
     "@coldcash/shared": "workspace:*",
