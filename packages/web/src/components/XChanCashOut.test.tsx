@@ -44,10 +44,12 @@ describe('XChanCashOut', () => {
       expect(screen.getByText(/Cash out KX → USDC via XChan/i)).toBeInTheDocument();
     });
 
-    it('shows both description paragraphs', () => {
+    it('shows Base network warning in copy', () => {
       render(<XChanCashOut />);
-      expect(screen.getByText(/Promises on ColdCash settle natively in KX/i)).toBeInTheDocument();
-      expect(screen.getByText(/XChan converts KX to USDC/i)).toBeInTheDocument();
+      expect(screen.getByText(/on the Base network/i)).toBeInTheDocument();
+      expect(screen.getByText(/USDC from XChan arrives on Base/i)).toBeInTheDocument();
+      expect(screen.getByText(/ColdCash escrow payouts use Arbitrum/i)).toBeInTheDocument();
+      expect(screen.getByText(/always match your wallet's network to the payout source/i)).toBeInTheDocument();
     });
 
     it('displays external service warning', () => {
@@ -71,6 +73,22 @@ describe('XChanCashOut', () => {
     it('displays destination domain', () => {
       render(<XChanCashOut />);
       expect(screen.getByText('xchan.example.com')).toBeInTheDocument();
+    });
+  });
+
+  describe('with production xchan.io URL', () => {
+    beforeEach(() => {
+      process.env.NEXT_PUBLIC_XCHAN_URL = 'https://xchan.io';
+    });
+
+    it('renders domain as xchan.io', () => {
+      render(<XChanCashOut />);
+      expect(screen.getByText('xchan.io')).toBeInTheDocument();
+    });
+
+    it('renders Base network warning when active', () => {
+      render(<XChanCashOut />);
+      expect(screen.getByText(/on the Base network/i)).toBeInTheDocument();
     });
 
     it('rejects non-https URLs', () => {
