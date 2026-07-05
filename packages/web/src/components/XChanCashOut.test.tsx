@@ -58,13 +58,13 @@ describe('XChanCashOut', () => {
       render(<XChanCashOut />);
       expect(screen.getByText(/on the Base network/i)).toBeInTheDocument();
       expect(screen.getByText(/USDC from XChan arrives on Base/i)).toBeInTheDocument();
-      expect(screen.getByText(/ColdCash escrow payouts use Arbitrum/i)).toBeInTheDocument();
+      expect(screen.getByText(/Escrow payouts use Arbitrum/i)).toBeInTheDocument();
       expect(screen.getByText(/always match your wallet's network to the payout source/i)).toBeInTheDocument();
     });
 
     it('displays external service warning', () => {
       render(<XChanCashOut />);
-      expect(screen.getByText(/You are leaving ColdCash — XChan is a separate service/i)).toBeInTheDocument();
+      expect(screen.getByText(/You are leaving this site — XChan is a separate service/i)).toBeInTheDocument();
     });
 
     it('renders link with correct href', () => {

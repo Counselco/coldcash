@@ -118,11 +118,11 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
       )}
 
       <p style={{ fontSize: '0.95rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
-        Promises on ColdCash settle natively in KX. XChan converts KX to USDC <strong>on the Base network</strong>.
+        Promises settle natively in KX. XChan converts KX to USDC <strong>on the Base network</strong>.
       </p>
 
       <p style={{ fontSize: '0.95rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
-        <strong>USDC from XChan arrives on Base. ColdCash escrow payouts use Arbitrum. These are different networks — always match your wallet's network to the payout source.</strong>
+        <strong>USDC from XChan arrives on Base. Escrow payouts use Arbitrum. These are different networks — always match your wallet's network to the payout source.</strong>
       </p>
 
       <div
@@ -136,7 +136,7 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
           color: '#856404',
         }}
       >
-        ⚠️ You are leaving ColdCash — XChan is a separate service
+        ⚠️ You are leaving this site — XChan is a separate service
       </div>
 
       <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>

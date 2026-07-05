@@ -1,0 +1,32 @@
+[Unit]
+Description=Upon Proof API Service
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=uponproof
+Group=uponproof
+WorkingDirectory=/opt/uponproof/api
+EnvironmentFile=/opt/uponproof/api/.env
+
+# Start the API service
+ExecStart=/usr/bin/node /opt/uponproof/api/dist/index.js
+
+# Restart policy
+Restart=always
+RestartSec=10s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/uponproof/api/logs
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=uponproof-api
+
+[Install]
+WantedBy=multi-user.target
