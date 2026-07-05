@@ -1,0 +1,15 @@
+{
+  "grant_id": "coldcash-g0001",
+  "window": 1,
+  "metric_value": 1,
+  "evidence_hash": "0x813bba1e31e4e1db333fe1c258926a1fc73deb6c4b282ae82835f9e9f1413664",
+  "evidence_bundle": {
+    "repo": "Counselco/coldcash-anchor-test",
+    "pr_number": 1,
+    "merge_commit_sha": "c786c35683c6343dff09d102cb5a00c126a959bc",
+    "merged_at": "2026-07-05T11:35:58Z",
+    "source": "github-rest"
+  },
+  "generated_at": "2026-07-05T11:38:22.956Z",
+  "comment": "UNSIGNED record - signature is witness operator's act on ChronX side"
+}
