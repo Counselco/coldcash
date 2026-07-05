@@ -132,13 +132,16 @@ describe('XChanCashOut', () => {
       process.env.NEXT_PUBLIC_XCHAN_URL = 'https://xchan.io';
     });
 
-    it('fetches and displays quote when kxAmount is provided', async () => {
+    it('shows USDC estimate when flag is true and provenance exists', async () => {
+      process.env.NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE = 'true';
+      const testAsOf = Date.now();
       mockQuoteKxToUsdc.mockResolvedValueOnce({
         usdc: 15.5,
         rate: 0.0031,
-        asOf: Date.now(),
+        asOf: testAsOf,
         maxSwapUsd: 500,
         reserveStatus: 'OK',
+        hasProvenance: true,
       });
 
       render(<XChanCashOut kxAmount={5000} />);
@@ -147,6 +150,66 @@ describe('XChanCashOut', () => {
         expect(screen.getByText(/5,000 KX/i)).toBeInTheDocument();
         expect(screen.getByText(/≈ \$15.50 USDC/i)).toBeInTheDocument();
         expect(screen.getByText(/Rate: 1 KX = \$0.00310/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows pending message when flag is true but no provenance', async () => {
+      process.env.NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE = 'true';
+      mockQuoteKxToUsdc.mockResolvedValueOnce({
+        usdc: 15.5,
+        rate: null,
+        asOf: null,
+        maxSwapUsd: 500,
+        reserveStatus: 'OK',
+        hasProvenance: false,
+      });
+
+      render(<XChanCashOut kxAmount={5000} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/5,000 KX/i)).toBeInTheDocument();
+        expect(screen.getByText(/USDC estimate pending verified rate/i)).toBeInTheDocument();
+        expect(screen.queryByText(/\$/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows pending message when flag is false even with provenance', async () => {
+      process.env.NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE = 'false';
+      mockQuoteKxToUsdc.mockResolvedValueOnce({
+        usdc: 15.5,
+        rate: 0.0031,
+        asOf: Date.now(),
+        maxSwapUsd: 500,
+        reserveStatus: 'OK',
+        hasProvenance: true,
+      });
+
+      render(<XChanCashOut kxAmount={5000} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/5,000 KX/i)).toBeInTheDocument();
+        expect(screen.getByText(/USDC estimate pending verified rate/i)).toBeInTheDocument();
+        expect(screen.queryByText(/\$/i)).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows pending message when flag is unset (defaults to false)', async () => {
+      // Don't set NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE
+      mockQuoteKxToUsdc.mockResolvedValueOnce({
+        usdc: 15.5,
+        rate: 0.0031,
+        asOf: Date.now(),
+        maxSwapUsd: 500,
+        reserveStatus: 'OK',
+        hasProvenance: true,
+      });
+
+      render(<XChanCashOut kxAmount={5000} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/5,000 KX/i)).toBeInTheDocument();
+        expect(screen.getByText(/USDC estimate pending verified rate/i)).toBeInTheDocument();
+        expect(screen.queryByText(/\$/i)).not.toBeInTheDocument();
       });
     });
 
@@ -186,16 +249,19 @@ describe('XChanCashOut', () => {
     });
 
     it('refetches quote when kxAmount changes', async () => {
+      process.env.NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE = 'true';
       mockQuoteKxToUsdc
         .mockResolvedValueOnce({
           usdc: 10,
           rate: 0.0025,
           asOf: Date.now(),
+          hasProvenance: true,
         })
         .mockResolvedValueOnce({
           usdc: 20,
           rate: 0.0025,
           asOf: Date.now(),
+          hasProvenance: true,
         });
 
       const { rerender } = render(<XChanCashOut kxAmount={4000} />);

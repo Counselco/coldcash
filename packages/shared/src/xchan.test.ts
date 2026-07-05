@@ -12,7 +12,35 @@ describe("XChanClient", () => {
   });
 
   describe("quoteKxToUsdc", () => {
-    it("returns quote when API responds successfully", async () => {
+    it("returns quote with provenance when API provides rate + as_of", async () => {
+      const testAsOf = Date.now() - 5000;
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          price: 0.003076975421609258,
+          price_usd: 0.003076975421609258,
+          rate: 0.003076975421609258,
+          as_of: testAsOf,
+          currency: "USD",
+          source: "v4_slot0",
+          can_swap: true,
+          max_swap_usd: 332.5,
+          reserve_status: "OK",
+        }),
+      });
+
+      const result = await client.quoteKxToUsdc(1000);
+
+      expect(result).not.toBeNull();
+      expect(result!.usdc).toBeCloseTo(3.077, 3);
+      expect(result!.rate).toBeCloseTo(0.003077, 6);
+      expect(result!.asOf).toBe(testAsOf);
+      expect(result!.hasProvenance).toBe(true);
+      expect(result!.maxSwapUsd).toBe(332.5);
+      expect(result!.reserveStatus).toBe("OK");
+    });
+
+    it("returns quote without provenance when API lacks rate or as_of", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -30,13 +58,14 @@ describe("XChanClient", () => {
 
       expect(result).not.toBeNull();
       expect(result!.usdc).toBeCloseTo(3.077, 3);
-      expect(result!.rate).toBeCloseTo(0.003077, 6);
+      expect(result!.rate).toBeNull();
+      expect(result!.asOf).toBeNull();
+      expect(result!.hasProvenance).toBe(false);
       expect(result!.maxSwapUsd).toBe(332.5);
       expect(result!.reserveStatus).toBe("OK");
-      expect(result!.asOf).toBeGreaterThan(Date.now() - 1000);
     });
 
-    it("calculates correct USDC for different KX amounts", async () => {
+    it("calculates correct USDC for different KX amounts (no provenance)", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -49,7 +78,8 @@ describe("XChanClient", () => {
 
       expect(result).not.toBeNull();
       expect(result!.usdc).toBe(10);
-      expect(result!.rate).toBe(0.005);
+      expect(result!.rate).toBeNull();
+      expect(result!.hasProvenance).toBe(false);
     });
 
     it("returns null when API returns non-ok status", async () => {
@@ -83,7 +113,7 @@ describe("XChanClient", () => {
       expect(result).toBeNull();
     });
 
-    it("falls back to price when price_usd is missing", async () => {
+    it("falls back to price when price_usd is missing (no provenance)", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -95,7 +125,8 @@ describe("XChanClient", () => {
 
       expect(result).not.toBeNull();
       expect(result!.usdc).toBe(2);
-      expect(result!.rate).toBe(0.004);
+      expect(result!.rate).toBeNull();
+      expect(result!.hasProvenance).toBe(false);
     });
 
     it("defaults missing fields to safe values", async () => {
@@ -115,7 +146,23 @@ describe("XChanClient", () => {
   });
 
   describe("getKxToUsdcRate", () => {
-    it("returns rate for 1 KX", async () => {
+    it("returns rate for 1 KX when provenance exists", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          price: 0.0035,
+          rate: 0.0035,
+          as_of: Date.now(),
+        }),
+      });
+
+      const rate = await client.getKxToUsdcRate();
+
+      expect(rate).toBe(0.0035);
+      expect(mockFetch).toHaveBeenCalledWith("https://test.api/xchan/price");
+    });
+
+    it("returns null when no provenance", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -125,8 +172,7 @@ describe("XChanClient", () => {
 
       const rate = await client.getKxToUsdcRate();
 
-      expect(rate).toBe(0.0035);
-      expect(mockFetch).toHaveBeenCalledWith("https://test.api/xchan/price");
+      expect(rate).toBeNull();
     });
 
     it("returns null when quote fails", async () => {

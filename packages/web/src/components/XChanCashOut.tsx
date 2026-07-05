@@ -10,7 +10,8 @@ interface XChanCashOutProps {
 export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
   const xchanUrl = process.env.NEXT_PUBLIC_XCHAN_URL;
   const isDev = process.env.NODE_ENV === 'development';
-  const [quote, setQuote] = useState<{ usdc: number; rate: number; asOf: number } | null>(null);
+  const trustXchanPrice = process.env.NEXT_PUBLIC_COLDCASH_TRUST_XCHAN_PRICE === 'true';
+  const [quote, setQuote] = useState<{ usdc: number; rate: number | null; asOf: number | null; hasProvenance: boolean } | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -22,7 +23,12 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
         const client = new XChanClient();
         const result = await client.quoteKxToUsdc(kxAmount);
         if (result) {
-          setQuote({ usdc: result.usdc, rate: result.rate, asOf: result.asOf });
+          setQuote({
+            usdc: result.usdc,
+            rate: result.rate,
+            asOf: result.asOf,
+            hasProvenance: result.hasProvenance
+          });
         }
       } catch (error) {
         console.error('Failed to fetch XChan quote:', error);
@@ -92,12 +98,20 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
             </div>
           ) : quote ? (
             <>
-              <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0369a1' }}>
-                ≈ ${quote.usdc.toFixed(2)} USDC
-              </div>
-              <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
-                Rate: 1 KX = ${quote.rate.toFixed(5)} • {new Date(quote.asOf).toLocaleTimeString()}
-              </div>
+              {trustXchanPrice && quote.hasProvenance ? (
+                <>
+                  <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0369a1' }}>
+                    ≈ ${quote.usdc.toFixed(2)} USDC
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                    Rate: 1 KX = ${quote.rate!.toFixed(5)} • {new Date(quote.asOf!).toLocaleTimeString()}
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: '0.9rem', color: '#666', fontStyle: 'italic' }}>
+                  USDC estimate pending verified rate
+                </div>
+              )}
             </>
           ) : null}
         </div>

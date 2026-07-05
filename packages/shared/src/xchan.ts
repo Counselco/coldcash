@@ -3,10 +3,11 @@ import type { RateProvider } from "./types.js";
 
 export interface XChanQuote {
   usdc: number;
-  rate: number;
-  asOf: number;
+  rate: number | null;  // null if API doesn't provide verified rate
+  asOf: number | null;  // null if API doesn't provide timestamp
   maxSwapUsd: number;
   reserveStatus: string;
+  hasProvenance: boolean;  // true only if API provided rate AND as_of
 }
 
 export interface XChanRegistration {
@@ -30,6 +31,8 @@ interface PriceApiResponse {
   can_swap?: boolean;
   max_swap_usd?: number;
   reserve_status?: string;
+  rate?: number;  // Verified rate from API (per XCHAN-API-REQUIREMENTS.md)
+  as_of?: number; // Unix timestamp ms when rate was generated
 }
 
 interface RegisterApiResponse {
@@ -64,16 +67,20 @@ export class XChanClient implements RateProvider {
 
       const data = (await response.json()) as PriceApiResponse;
 
-      // API returns price per KX in USD
-      const pricePerKx = data.price_usd ?? data.price;
+      // Check for provenance: API must provide both rate AND as_of for verified data
+      const hasProvenance = typeof data.rate === "number" && typeof data.as_of === "number";
+
+      // Fallback to price/price_usd for compatibility, but mark as unverified
+      const pricePerKx = hasProvenance ? data.rate! : (data.price_usd ?? data.price);
       if (typeof pricePerKx !== "number" || pricePerKx <= 0) return null;
 
       return {
         usdc: kx * pricePerKx,
-        rate: pricePerKx,
-        asOf: Date.now(),
+        rate: hasProvenance ? data.rate! : null,
+        asOf: hasProvenance ? data.as_of! : null,
         maxSwapUsd: data.max_swap_usd ?? 0,
         reserveStatus: data.reserve_status ?? "UNKNOWN",
+        hasProvenance,
       };
     } catch (error) {
       console.error("XChan quote failed:", error);

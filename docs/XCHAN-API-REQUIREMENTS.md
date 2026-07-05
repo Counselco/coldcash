@@ -38,7 +38,7 @@ GET /api/quote?kx=<amount>
 {
   "usdc_estimate": 125.50,
   "rate": 0.003185,
-  "pool_depth_usdc": 15000.00,
+  "reserve_depth_usdc": 15000.00,
   "as_of": 1720134520000
 }
 ```
@@ -46,10 +46,10 @@ GET /api/quote?kx=<amount>
 **Fields:**
 - `usdc_estimate` (number): Estimated USDC output for the quoted KX amount
 - `rate` (number): Current price of 1 KX in USDC
-- `pool_depth_usdc` (number): **REQUIRED** — Available USDC liquidity in the pool
+- `reserve_depth_usdc` (number): **REQUIRED** — Available USDC liquidity in the pool
 - `as_of` (integer): Unix timestamp (milliseconds) when the quote was generated
 
-**Why pool_depth_usdc is required:**
+**Why reserve_depth_usdc is required:**
 
 Recipients deciding whether to work for a KX-denominated promise deserve transparency about the exit liquidity. A quote without pool depth is an incomplete signal — a $1000 payout looks different when backed by $500 vs $50,000 in reserves.
 
