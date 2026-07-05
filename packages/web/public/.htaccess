@@ -1,0 +1,15 @@
+# Ensure static files are served directly
+<FilesMatch "\.(json|txt|html|js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$">
+  Header set Cache-Control "public, max-age=3600"
+</FilesMatch>
+
+# Disable directory browsing
+Options -Indexes
+
+# Enable following symlinks
+Options +FollowSymLinks
+
+# Allow access to data directory
+<Directory "data">
+  Require all granted
+</Directory>

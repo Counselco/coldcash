@@ -94,6 +94,11 @@ fi
 
 echo "✓ Credentials loaded (host: $FTP_HOST, user: $FTP_USER)"
 
+# Export credentials for Python subprocess
+export FTP_HOST
+export FTP_USER
+export FTP_PASS
+
 # ============================================================================
 # Step 2: Build the static site
 # ============================================================================
@@ -126,6 +131,7 @@ else
 fi
 
 EXPORT_DIR="$REPO_ROOT/packages/web/out"
+export EXPORT_DIR
 
 # ============================================================================
 # Step 3: Upload to Hostinger via FTP
@@ -153,18 +159,18 @@ PLACEHOLDERS = [
     # (We'll check file size as a proxy; Hostinger placeholders are typically < 5KB)
 ]
 
-def upload_directory(ftp, local_root, remote_root='public_html'):
+def upload_directory(ftp, local_root):
     """Recursively upload directory to FTP server"""
     uploaded_files = 0
     uploaded_bytes = 0
 
-    # Ensure we're in the correct remote directory
+    # Try to cwd into public_html if it exists; ignore if we're already there or it's the root
     try:
-        ftp.cwd(remote_root)
+        ftp.cwd('public_html')
+        print(f"✓ Changed to public_html directory")
     except ftplib.error_perm:
-        print(f"Creating remote directory: {remote_root}")
-        ftp.mkd(remote_root)
-        ftp.cwd(remote_root)
+        # Either already in public_html or it doesn't exist - proceed with current directory
+        print(f"✓ Using current directory (may already be in public_html)")
 
     # Delete known placeholders
     for placeholder in PLACEHOLDERS:
@@ -189,33 +195,33 @@ def upload_directory(ftp, local_root, remote_root='public_html'):
     for root, dirs, files in os.walk(local_path):
         rel_root = Path(root).relative_to(local_path)
 
-        # Create remote directories
+        # Create remote subdirectories (relative to current working directory)
         if str(rel_root) != '.':
             remote_dir_parts = Path(rel_root).parts
-            current_remote = remote_root
 
-            for part in remote_dir_parts:
+            # Build path incrementally to create missing subdirectories
+            for i, part in enumerate(remote_dir_parts):
+                subdir_path = '/'.join(remote_dir_parts[:i+1])
                 try:
-                    ftp.cwd(f"{current_remote}/{part}")
-                    current_remote = f"{current_remote}/{part}"
-                except ftplib.error_perm:
-                    print(f"  Creating directory: {current_remote}/{part}")
-                    ftp.mkd(f"{current_remote}/{part}")
-                    current_remote = f"{current_remote}/{part}"
+                    # Try to create the directory (will fail if it exists)
+                    ftp.mkd(subdir_path)
+                    print(f"  Created subdirectory: {subdir_path}")
+                except ftplib.error_perm as e:
+                    # Directory already exists or creation failed
+                    if "exists" not in str(e).lower() and "550" not in str(e):
+                        print(f"  Warning: Could not create subdirectory {subdir_path}: {e}")
+                    # Continue regardless
 
-            # Reset to public_html
-            ftp.cwd(remote_root)
-
-        # Upload files
+        # Upload files with paths RELATIVE to current working directory
         for filename in files:
             local_file = Path(root) / filename
-            remote_file = str(Path(remote_root) / rel_root / filename)
+            # Remote path is relative to where we are (public_html)
+            remote_file = str(rel_root / filename) if str(rel_root) != '.' else filename
 
             with open(local_file, 'rb') as f:
-                file_data = f.read()
-                file_size = len(file_data)
+                file_size = os.path.getsize(local_file)
 
-                # Use STOR to upload
+                # Use STOR to upload (path is relative to current directory)
                 ftp.storbinary(f'STOR {remote_file}', open(local_file, 'rb'))
                 uploaded_files += 1
                 uploaded_bytes += file_size

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PayoutQR } from '@/components/PayoutQR';
 
 interface ResolutionData {
@@ -20,8 +21,10 @@ interface ResolutionData {
   pool_kx: string;
 }
 
-export default function StatusPage() {
-  const [grantId, setGrantId] = useState('coldcash-g0001');
+function StatusPageContent() {
+  const searchParams = useSearchParams();
+  const queryGrantId = searchParams.get('grant');
+  const [grantId, setGrantId] = useState(queryGrantId || 'coldcash-g0001');
   const [loading, setLoading] = useState(false);
   const [resolution, setResolution] = useState<ResolutionData | null>(null);
   const [error, setError] = useState('');
@@ -34,6 +37,30 @@ export default function StatusPage() {
     setLoading(true);
     setError('');
     try {
+      // For g0001, use embedded data (inaugural grant)
+      if (grantId === 'coldcash-g0001') {
+        const g0001Data: ResolutionData = {
+          grant_id: "coldcash-g0001",
+          resolution: {
+            grant_id: "coldcash-g0001",
+            payload_hash: "0xf5971717a4e12c67efddd69bf043b12169f964b3126906e3fa86717dfb061cea",
+            window: 1,
+            metric_value: 1,
+            evidence_hash: "0x813bba1e31e4e1db333fe1c258926a1fc73deb6c4b282ae82835f9e9f1413664",
+            payout_kx: "1000",
+            settlement_ref: null,
+            resolved_at: "2026-07-05T11:39:56.948Z"
+          },
+          grantee_seat: "dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ",
+          grantor_seat: "dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ",
+          pool_kx: "50000"
+        };
+        setResolution(g0001Data);
+        setLoading(false);
+        return;
+      }
+
+      // For other grants, fetch from server
       const response = await fetch(`/data/${grantId}-payout.json`);
       if (!response.ok) {
         throw new Error(`Grant ${grantId} not found`);
@@ -50,6 +77,39 @@ export default function StatusPage() {
   return (
     <main>
       <h2>Resolution Status</h2>
+
+      {!queryGrantId && !resolution && !loading && (
+        <div style={{
+          marginTop: '1.5rem',
+          padding: '1rem',
+          backgroundColor: '#eff6ff',
+          borderRadius: '6px',
+          border: '1px solid #3b82f6'
+        }}>
+          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#1e40af' }}>
+            Latest Resolved Grant
+          </p>
+          <p style={{ margin: '0.25rem 0', fontSize: '0.95rem' }}>
+            <strong>coldcash-g0001</strong> — inaugural kept promise
+          </p>
+          <a
+            href="/status?grant=coldcash-g0001"
+            style={{
+              display: 'inline-block',
+              marginTop: '0.5rem',
+              padding: '0.5rem 1rem',
+              fontSize: '0.9rem',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              textDecoration: 'none',
+              borderRadius: '4px',
+            }}
+          >
+            View Payout →
+          </a>
+        </div>
+      )}
+
       <div style={{ marginTop: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
           Grant ID
@@ -130,5 +190,13 @@ export default function StatusPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function StatusPage() {
+  return (
+    <Suspense fallback={<main><h2>Loading...</h2></main>}>
+      <StatusPageContent />
+    </Suspense>
   );
 }

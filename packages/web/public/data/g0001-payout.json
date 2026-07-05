@@ -10,8 +10,7 @@
     "settlement_ref": null,
     "resolved_at": "2026-07-05T11:39:56.948Z"
   },
-  "grantee_seat": "0x0000000000000000000000000000000000000000",
-  "grantor_seat": "0x0000000000000000000000000000000000000000",
-  "pool_kx": "50000",
-  "_note": "grantee_seat and grantor_seat are placeholders - armed payload not accessible. Update with real addresses from /Users/bigwater/chronx-work/state/checkpoints/coldcash-g0001-armed.json"
+  "grantee_seat": "dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ",
+  "grantor_seat": "dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ",
+  "pool_kx": "50000"
 }
