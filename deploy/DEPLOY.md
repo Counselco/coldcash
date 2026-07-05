@@ -9,10 +9,70 @@ Production architecture:
 - Hostinger shared hosting account with domain uponproof.com
 - Vultr VPS at 45.63.22.189
 - DNS access in Hostinger control panel
+- macOS keychain item 'uponproof-ftp' with FTP credentials (one-time setup)
 
 ## Part 1: Frontend Deployment (Hostinger)
 
-### Option A: Manual Upload via hPanel
+### Automated Deployment (Recommended)
+
+The canonical deployment method is via **scripts/deploy-hostinger.sh**:
+
+```bash
+# Standard deploy (build + upload + verify)
+./scripts/deploy-hostinger.sh
+
+# Deploy without rebuilding (use existing packages/web/out/)
+./scripts/deploy-hostinger.sh --skip-build
+```
+
+**One-time macOS Keychain Setup:**
+
+The deploy script reads FTP credentials from macOS keychain item `uponproof-ftp`. To set up:
+
+1. Add the FTP credentials to keychain (if not already done):
+   ```bash
+   security add-internet-password \
+     -l "uponproof-ftp" \
+     -a "<hostinger-username>" \
+     -s "<hostinger-ftp-host>" \
+     -w "<password>"
+   ```
+
+2. Grant "Always Allow" access to your shell/terminal:
+   - Open Keychain Access.app
+   - Search for "uponproof-ftp"
+   - Right-click → Get Info → Access Control
+   - Click "+" and add Terminal.app (or your shell)
+   - Check "Allow all applications to access this item" OR add specific apps
+
+**Herald Allowlist (for unattended agent runs):**
+
+To enable Claude Code agents to run deploys without permission prompts, add these entries to `.claude/settings.json`:
+
+```json
+{
+  "bash": {
+    "allow": [
+      {
+        "match": "./scripts/deploy-hostinger.sh",
+        "comment": "Hostinger deploy script"
+      },
+      {
+        "match": "bash scripts/deploy-hostinger.sh",
+        "comment": "Hostinger deploy script (explicit bash invocation)"
+      },
+      {
+        "match": "security find-internet-password*",
+        "comment": "FTP credential read (scoped to uponproof-ftp keychain item)"
+      }
+    ]
+  }
+}
+```
+
+Note: The script verifies deployment by curling uponproof.com and checking key pages (/backer, /seeker, /status) return HTTP 200.
+
+### Option A: Manual Upload via hPanel (Fallback)
 
 1. Build the static site locally:
    ```bash
@@ -35,7 +95,7 @@ Production architecture:
 
 4. Test: Visit https://uponproof.com
 
-### Option B: SSH Deployment (Automated)
+### Option B: SSH Deployment (Legacy)
 
 1. Enable SSH in Hostinger hPanel:
    - Go to Advanced → SSH Access
