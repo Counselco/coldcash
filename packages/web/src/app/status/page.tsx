@@ -1,40 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { PayoutQR } from '@/components/PayoutQR';
+
+interface ResolutionData {
+  grant_id: string;
+  resolution: {
+    grant_id: string;
+    payload_hash: string;
+    window: number;
+    metric_value: number;
+    evidence_hash: string;
+    payout_kx: string;
+    settlement_ref: string | null;
+    resolved_at: string;
+  };
+  grantee_seat: string;
+  grantor_seat: string;
+  pool_kx: string;
+}
 
 export default function StatusPage() {
-  const [promiseId, setPromiseId] = useState('');
+  const [grantId, setGrantId] = useState('coldcash-g0001');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<any>(null);
+  const [resolution, setResolution] = useState<ResolutionData | null>(null);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    handleLoad();
+  }, []);
 
   const handleLoad = async () => {
     setLoading(true);
     setError('');
     try {
-      // In real impl, fetch /promises/:id
-      // For demo, simulate
-      const mockStatus = {
-        status: 'Accepted',
-        backer: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-        seeker: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
-        prize: '100.00 USDC',
-        frozen: {
-          goal: 'Merge PR #42 in testorg/testrepo',
-          standardHash: '0x' + '0'.repeat(64),
-        },
-        escrowBalance: '100.00 USDC',
-        attestations: [
-          {
-            id: 'att_1',
-            timestamp: Date.now() / 1000,
-            payoutBps: 10000,
-            evidenceHash: '0x' + '1'.repeat(64),
-            txHash: '0x' + '2'.repeat(64),
-          },
-        ],
-      };
-      setStatus(mockStatus);
+      const response = await fetch(`/data/${grantId}-payout.json`);
+      if (!response.ok) {
+        throw new Error(`Grant ${grantId} not found`);
+      }
+      const data = await response.json();
+      setResolution(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -44,16 +49,16 @@ export default function StatusPage() {
 
   return (
     <main>
-      <h2>Status: View Promise State</h2>
+      <h2>Resolution Status</h2>
       <div style={{ marginTop: '2rem' }}>
         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
-          Promise ID
+          Grant ID
         </label>
         <input
           type="text"
-          value={promiseId}
-          onChange={(e) => setPromiseId(e.target.value)}
-          placeholder="0x..."
+          value={grantId}
+          onChange={(e) => setGrantId(e.target.value)}
+          placeholder="coldcash-g0001"
           style={{
             width: '100%',
             padding: '0.5rem',
@@ -64,7 +69,7 @@ export default function StatusPage() {
         />
         <button
           onClick={handleLoad}
-          disabled={loading || !promiseId}
+          disabled={loading || !grantId}
           style={{
             marginTop: '1rem',
             padding: '0.75rem 1.5rem',
@@ -74,10 +79,10 @@ export default function StatusPage() {
             border: 'none',
             borderRadius: '4px',
             cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading || !promiseId ? 0.6 : 1,
+            opacity: loading || !grantId ? 0.6 : 1,
           }}
         >
-          {loading ? 'Loading...' : 'Load Status'}
+          {loading ? 'Loading...' : 'Load Resolution'}
         </button>
       </div>
 
@@ -87,48 +92,43 @@ export default function StatusPage() {
         </div>
       )}
 
-      {status && (
-        <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-          <h3>Live Escrow State</h3>
-          <p><strong>Status:</strong> <span style={{ fontWeight: 'bold', color: getStatusColor(status.status) }}>{status.status}</span></p>
-          <p><strong>Backer:</strong> {status.backer}</p>
-          {status.seeker && <p><strong>Seeker:</strong> {status.seeker}</p>}
-          <p><strong>Prize:</strong> {status.prize}</p>
-          <p><strong>Escrow Balance:</strong> {status.escrowBalance}</p>
+      {resolution && (
+        <div style={{ marginTop: '2rem' }}>
+          <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+            <h3>Resolution Record</h3>
+            <p><strong>Grant ID:</strong> {resolution.grant_id}</p>
+            <p><strong>Window:</strong> {resolution.resolution.window}</p>
+            <p><strong>Metric Value:</strong> {resolution.resolution.metric_value}</p>
+            <p><strong>Payout:</strong> {resolution.resolution.payout_kx} KX</p>
+            <p><strong>Resolved At:</strong> {new Date(resolution.resolution.resolved_at).toLocaleString()}</p>
+            <p><strong>Evidence Hash:</strong> <code style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{resolution.resolution.evidence_hash}</code></p>
+            <p><strong>Payload Hash:</strong> <code style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{resolution.resolution.payload_hash}</code></p>
+          </div>
 
-          <hr style={{ margin: '1rem 0' }} />
+          {parseFloat(resolution.resolution.payout_kx) > 0 && (
+            <PayoutQR
+              grantId={resolution.grant_id}
+              granteeAddress={resolution.grantee_seat}
+              payoutKx={resolution.resolution.payout_kx}
+              resolutionHashPrefix={resolution.resolution.payload_hash.slice(0, 10)}
+            />
+          )}
 
-          <h4>Frozen Standard</h4>
-          <p><strong>Goal:</strong> {status.frozen.goal}</p>
-          <p><strong>Standard Hash:</strong> <code>{status.frozen.standardHash}</code></p>
-
-          {status.attestations && status.attestations.length > 0 && (
-            <>
-              <hr style={{ margin: '1rem 0' }} />
-              <h4>Evidence / Attestation Trail</h4>
-              {status.attestations.map((att: any) => (
-                <div key={att.id} style={{ marginTop: '0.5rem', paddingLeft: '1rem', borderLeft: '3px solid #0070f3' }}>
-                  <p><strong>Timestamp:</strong> {new Date(att.timestamp * 1000).toLocaleString()}</p>
-                  <p><strong>Payout BPS:</strong> {att.payoutBps} ({(att.payoutBps / 100).toFixed(2)}%)</p>
-                  <p><strong>Evidence Hash:</strong> <code>{att.evidenceHash}</code></p>
-                  <p><strong>TX Hash:</strong> <code>{att.txHash}</code></p>
-                </div>
-              ))}
-            </>
+          {parseFloat(resolution.resolution.payout_kx) === 0 && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '1rem',
+              backgroundColor: '#fef3c7',
+              borderRadius: '4px',
+              border: '1px solid #fbbf24'
+            }}>
+              <p style={{ margin: 0, color: '#92400e' }}>
+                ⚠️ Zero payout - no settlement action required
+              </p>
+            </div>
           )}
         </div>
       )}
     </main>
   );
-}
-
-function getStatusColor(status: string): string {
-  switch (status) {
-    case 'Offered': return '#0070f3';
-    case 'Accepted': return '#ff8c00';
-    case 'Paid': return '#00c800';
-    case 'Refunded': return '#666';
-    case 'Canceled': return '#666';
-    default: return '#000';
-  }
 }

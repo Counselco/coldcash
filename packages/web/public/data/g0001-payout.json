@@ -1,0 +1,17 @@
+{
+  "grant_id": "coldcash-g0001",
+  "resolution": {
+    "grant_id": "coldcash-g0001",
+    "payload_hash": "0xf5971717a4e12c67efddd69bf043b12169f964b3126906e3fa86717dfb061cea",
+    "window": 1,
+    "metric_value": 1,
+    "evidence_hash": "0x813bba1e31e4e1db333fe1c258926a1fc73deb6c4b282ae82835f9e9f1413664",
+    "payout_kx": "1000",
+    "settlement_ref": null,
+    "resolved_at": "2026-07-05T11:39:56.948Z"
+  },
+  "grantee_seat": "0x0000000000000000000000000000000000000000",
+  "grantor_seat": "0x0000000000000000000000000000000000000000",
+  "pool_kx": "50000",
+  "_note": "grantee_seat and grantor_seat are placeholders - armed payload not accessible. Update with real addresses from /Users/bigwater/chronx-work/state/checkpoints/coldcash-g0001-armed.json"
+}
