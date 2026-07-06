@@ -202,20 +202,109 @@ export class IntakeEngine {
     const hasConsent = /\b(i understand|subjective|manual|consent)\b/i.test(wish);
 
     const cleanWish = wish.replace(/\b(i understand|subjective|manual|consent)\b/gi, "").trim();
+    const goal = cleanWish || wish;
+
+    // Derive goal-specific evidence where possible
+    const evidence = this.deriveEvidence(goal);
 
     return {
       kind: "manual-attestation",
-      goal: cleanWish || wish,
-      success_criteria: `Achieve: ${cleanWish || wish}`,
-      evidence_required: "Photo, video, or document evidence demonstrating completion",
+      goal,
+      success_criteria: `Achieve: ${goal}`,
+      evidence_required: evidence,
       subjectiveConsent: hasConsent,
     };
   }
 
-  private passesStructuralTest(spec: ManualAttestationSpec): boolean {
-    const hasAction = /\b(complete|finish|deliver|submit|upload|send|create|build|write|fix|merge|deploy)\b/i.test(spec.goal);
-    const hasRecord = /\b(photo|video|screenshot|document|file|image|receipt|proof|evidence|link|url)\b/i.test(spec.evidence_required);
+  private deriveEvidence(goal: string): string {
+    // If goal explicitly mentions evidence artifacts, reference them
+    if (/\b(submit|upload|post|share|send|deliver)\s+(?:a\s+)?(?:photo|video|screenshot|document|file|image|proof)\b/i.test(goal)) {
+      return "Submitted photo, video, or document as specified in goal";
+    }
+    if (/\bmerge\s+pr\b/i.test(goal)) {
+      return "GitHub merge confirmation with commit SHA";
+    }
+    if (/\bscreenshot\b/i.test(goal)) {
+      return "Screenshot demonstrating completion";
+    }
+    if (/\b(homework|assignment|essay|paper|report)\b/i.test(goal)) {
+      return "Completed assignment document or submission confirmation";
+    }
+    if (/\bgrade|gpa|straight\s+a/i.test(goal)) {
+      return "Official grade report or transcript";
+    }
 
-    return hasAction && hasRecord;
+    // Generic fallback - honest that evidence path is unspecified
+    return "Verifiable evidence demonstrating completion";
+  }
+
+  private passesStructuralTest(spec: ManualAttestationSpec): boolean {
+    const goal = spec.goal.toLowerCase();
+
+    // First: detect inherently subjective goals (feelings, moods, aesthetic judgments)
+    if (this.isSubjectiveGoal(goal)) {
+      return false;
+    }
+
+    // Second: detect "action verb + subjective object" bypass
+    // (e.g., "complete having a decent day")
+    if (this.hasSubjectiveActionPattern(goal)) {
+      return false;
+    }
+
+    // Third: check for concrete, controllable action
+    const hasConcreteAction = this.hasConcreteAction(goal);
+
+    // Fourth: check if goal references checkable artifacts/deliverables
+    // (Check the GOAL itself, not the hardcoded template)
+    const hasCheckableEvidence = this.hasCheckableEvidence(goal);
+
+    return hasConcreteAction && hasCheckableEvidence;
+  }
+
+  private isSubjectiveGoal(goal: string): boolean {
+    // Internal states, feelings, moods, aesthetic judgments
+    const subjectivePatterns = [
+      /\b(feel|feeling)\s+(better|good|bad|happy|sad|confident|proud|satisfied)/i,
+      /\b(be|being|am|is|are)\s+(happy|satisfied|proud|confident|better|content|fulfilled)/i,
+      /\bhave\s+a\s+(decent|good|great|nice|wonderful|amazing|productive|successful|better)\s+(day|time|week|morning|evening|experience)/i,
+      /\b(impress|satisfy|please)\s+(me|you|them|us|someone|others)/i,
+      /\b(mood|morale|spirit|vibe)s?\b/i,
+    ];
+
+    return subjectivePatterns.some(pattern => pattern.test(goal));
+  }
+
+  private hasSubjectiveActionPattern(goal: string): boolean {
+    // "complete/finish having a decent day" — action verb applied to subjective state
+    const patterns = [
+      /\b(complete|finish|achieve|accomplish)\s+(having|feeling|being)\s+/i,
+      /\b(complete|finish|achieve|accomplish)\s+a\s+(decent|good|great|nice|wonderful|happy|satisfied)\s+(day|time|mood|feeling)/i,
+    ];
+
+    return patterns.some(pattern => pattern.test(goal));
+  }
+
+  private hasConcreteAction(goal: string): boolean {
+    // Actions the seeker controls with concrete deliverables
+    const concreteActionPatterns = [
+      /\b(submit|upload|send|deliver|post|publish|share)\b/i,
+      /\bmerge\s+pr\b/i,
+      /\b(create|build|write|deploy|fix|complete|finish|earn|get)\b/i,
+    ];
+
+    return concreteActionPatterns.some(pattern => pattern.test(goal));
+  }
+
+  private hasCheckableEvidence(goal: string): boolean {
+    // Goal mentions evidence artifacts, deliverables, or checkable records
+    const evidencePatterns = [
+      /\b(photo|video|screenshot|document|file|image|receipt|proof|evidence)\b/i,
+      /\b(pr|pull\s+request|commit|merge|deploy|link|url)\b/i,
+      /\b(homework|assignment|essay|paper|report|grade|transcript|straight\s+a)/i,
+      /\b(submission|deliverable|degree|certification|project)\b/i,
+    ];
+
+    return evidencePatterns.some(pattern => pattern.test(goal));
   }
 }
