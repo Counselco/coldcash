@@ -51,92 +51,114 @@ export default function SeekerPage() {
   };
 
   return (
-    <main>
-      <h2>Seeker Flow: Accept Promise</h2>
-      <div style={{ marginTop: '2rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+    <div className="max-w-3xl mx-auto">
+      <div className="mb-8">
+        <h1 className="font-display text-4xl font-bold text-ink-900 mb-3">
+          Earn a Payout
+        </h1>
+        <p className="text-lg text-ink-700">
+          Accept a promise, do the work, prove you did it. Get paid instantly.
+        </p>
+      </div>
+
+      <div className="bg-white rounded-warm-lg shadow-warm p-8 border border-cream-300">
+        <label className="block text-ink-900 font-semibold mb-2">
           Promise Link / ID
         </label>
+        <p className="text-sm text-ink-600 mb-4">
+          Enter the promise identifier you received from the backer.
+        </p>
         <input
           type="text"
           value={promiseId}
           onChange={(e) => setPromiseId(e.target.value)}
           placeholder="0x..."
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            fontSize: '1rem',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-          }}
+          className="w-full px-4 py-3 border border-cream-300 rounded-warm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-ink-900 placeholder-ink-400"
         />
         <button
           onClick={handleLoad}
           disabled={loading || !promiseId}
-          style={{
-            marginTop: '1rem',
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading || !promiseId ? 0.6 : 1,
-          }}
+          className="mt-4 w-full px-6 py-3 bg-amber-500 text-white font-medium rounded-warm hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Loading...' : 'Load Promise'}
         </button>
       </div>
 
       {error && (
-        <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee', borderRadius: '4px', color: '#c00' }}>
+        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-warm text-red-800">
           {error}
         </div>
       )}
 
       {promise && (
-        <div style={{ marginTop: '2rem', padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-          <h3>Promise Details</h3>
-          <p><strong>Status:</strong> {promise.status}</p>
-          <p><strong>Prize:</strong> {promise.prize}</p>
-          <p><strong>Accept By:</strong> {new Date(promise.acceptBy * 1000).toLocaleString()}</p>
-          <p><strong>Deadline:</strong> {new Date(promise.deadline * 1000).toLocaleString()}</p>
+        <div className="mt-8 bg-white rounded-warm-lg shadow-warm p-8 border border-cream-300">
+          <h3 className="font-display text-2xl font-semibold text-ink-900 mb-6">
+            Promise Details
+          </h3>
 
-          <hr style={{ margin: '1rem 0' }} />
+          <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-cream-100 rounded-warm">
+            <div>
+              <p className="text-sm font-semibold text-ink-700 mb-1">Status</p>
+              <p className="text-ink-900">{promise.status}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink-700 mb-1">Prize</p>
+              <p className="text-ink-900 font-semibold text-lg">{promise.prize}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink-700 mb-1">Accept By</p>
+              <p className="text-ink-900 text-sm">{new Date(promise.acceptBy * 1000).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink-700 mb-1">Deadline</p>
+              <p className="text-ink-900 text-sm">{new Date(promise.deadline * 1000).toLocaleString()}</p>
+            </div>
+          </div>
 
-          <h4>Frozen Standard (What you're accepting)</h4>
-          <p><strong>Goal:</strong> {promise.frozen.goal}</p>
-          <p><strong>Success Criteria:</strong> {promise.frozen.success_criteria}</p>
-          <p><strong>Evidence Required:</strong> {promise.frozen.evidence_required}</p>
-          <p><strong>Standard Hash:</strong> <code>{promise.frozen.standardHash}</code></p>
+          <div className="border-t border-cream-300 pt-6">
+            <h4 className="font-display text-xl font-semibold text-ink-900 mb-4">
+              Frozen Standard (What you're accepting)
+            </h4>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Goal</p>
+                <p className="text-ink-900">{promise.frozen.goal}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Success Criteria</p>
+                <p className="text-ink-900">{promise.frozen.success_criteria}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Evidence Required</p>
+                <p className="text-ink-900">{promise.frozen.evidence_required}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Standard Hash</p>
+                <code className="text-xs text-ink-600 bg-cream-200 px-2 py-1 rounded break-all block">
+                  {promise.frozen.standardHash}
+                </code>
+              </div>
+            </div>
+          </div>
 
           {promise.status === 'Offered' && (
-            <>
+            <div className="mt-6">
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-warm mb-4">
+                <p className="text-amber-900 font-semibold text-sm">
+                  ⚠️ Acceptance is the point of no return
+                </p>
+              </div>
               <button
                 onClick={handleAccept}
                 disabled={loading}
-                style={{
-                  marginTop: '1rem',
-                  padding: '0.75rem 1.5rem',
-                  fontSize: '1rem',
-                  backgroundColor: '#00c800',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  opacity: loading ? 0.6 : 1,
-                }}
+                className="w-full px-6 py-3 bg-success-500 text-white font-medium rounded-warm hover:bg-success-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Accepting...' : 'Accept Promise'}
               </button>
-              <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
-                ⚠️ Acceptance is the point of no return
-              </p>
-            </>
+            </div>
           )}
         </div>
       )}
-    </main>
+    </div>
   );
 }

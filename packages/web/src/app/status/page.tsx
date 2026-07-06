@@ -24,14 +24,16 @@ interface ResolutionData {
 function StatusPageContent() {
   const searchParams = useSearchParams();
   const queryGrantId = searchParams.get('grant');
-  const [grantId, setGrantId] = useState(queryGrantId || 'coldcash-g0001');
+  const [grantId, setGrantId] = useState(queryGrantId || '');
   const [loading, setLoading] = useState(false);
   const [resolution, setResolution] = useState<ResolutionData | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    handleLoad();
-  }, []);
+    if (queryGrantId) {
+      handleLoad();
+    }
+  }, [queryGrantId]);
 
   const handleLoad = async () => {
     setLoading(true);
@@ -75,94 +77,112 @@ function StatusPageContent() {
   };
 
   return (
-    <main>
-      <h2>Resolution Status</h2>
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="font-display text-4xl font-bold text-ink-900 mb-3">
+          Resolution Status
+        </h1>
+        <p className="text-lg text-ink-700">
+          Check the status of resolved promises and view payout details.
+        </p>
+      </div>
 
       {!queryGrantId && !resolution && !loading && (
-        <div style={{
-          marginTop: '1.5rem',
-          padding: '1rem',
-          backgroundColor: '#eff6ff',
-          borderRadius: '6px',
-          border: '1px solid #3b82f6'
-        }}>
-          <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#1e40af' }}>
-            Latest Resolved Grant
-          </p>
-          <p style={{ margin: '0.25rem 0', fontSize: '0.95rem' }}>
-            <strong>coldcash-g0001</strong> — inaugural kept promise
-          </p>
-          <a
-            href="/status?grant=coldcash-g0001"
-            style={{
-              display: 'inline-block',
-              marginTop: '0.5rem',
-              padding: '0.5rem 1rem',
-              fontSize: '0.9rem',
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: '4px',
-            }}
-          >
-            View Payout →
-          </a>
+        <div className="mb-8 bg-gradient-to-br from-success-50 to-amber-50 rounded-warm-lg shadow-warm p-8 border border-success-200">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-success-500 rounded-warm flex items-center justify-center flex-shrink-0">
+              <span className="text-2xl">✓</span>
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-success-900 mb-2 text-lg">
+                Latest Resolved Grant
+              </p>
+              <p className="text-ink-900 mb-1">
+                <span className="font-mono font-semibold">coldcash-g0001</span> — inaugural kept promise
+              </p>
+              <p className="text-ink-700 text-sm mb-4">
+                First ColdCash grant resolved with ChronX consensus proof
+              </p>
+              <a
+                href="/status?grant=coldcash-g0001"
+                className="inline-block px-6 py-2.5 bg-success-500 text-white font-medium rounded-warm hover:bg-success-600 transition-colors"
+              >
+                View Payout →
+              </a>
+            </div>
+          </div>
         </div>
       )}
 
-      <div style={{ marginTop: '2rem' }}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>
+      <div className="bg-white rounded-warm-lg shadow-warm p-8 border border-cream-300">
+        <label className="block text-ink-900 font-semibold mb-2">
           Grant ID
         </label>
+        <p className="text-sm text-ink-600 mb-4">
+          Enter a grant ID to view its resolution status and payout details.
+        </p>
         <input
           type="text"
           value={grantId}
           onChange={(e) => setGrantId(e.target.value)}
           placeholder="coldcash-g0001"
-          style={{
-            width: '100%',
-            padding: '0.5rem',
-            fontSize: '1rem',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-          }}
+          className="w-full px-4 py-3 border border-cream-300 rounded-warm focus:outline-none focus:ring-2 focus:ring-warmAccent-500 focus:border-transparent text-ink-900 placeholder-ink-400 font-mono"
         />
         <button
           onClick={handleLoad}
           disabled={loading || !grantId}
-          style={{
-            marginTop: '1rem',
-            padding: '0.75rem 1.5rem',
-            fontSize: '1rem',
-            backgroundColor: '#0070f3',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading || !grantId ? 0.6 : 1,
-          }}
+          className="mt-4 w-full px-6 py-3 bg-warmAccent-500 text-white font-medium rounded-warm hover:bg-warmAccent-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? 'Loading...' : 'Load Resolution'}
         </button>
       </div>
 
       {error && (
-        <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: '#fee', borderRadius: '4px', color: '#c00' }}>
+        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-warm text-red-800">
           {error}
         </div>
       )}
 
       {resolution && (
-        <div style={{ marginTop: '2rem' }}>
-          <div style={{ padding: '1rem', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
-            <h3>Resolution Record</h3>
-            <p><strong>Grant ID:</strong> {resolution.grant_id}</p>
-            <p><strong>Window:</strong> {resolution.resolution.window}</p>
-            <p><strong>Metric Value:</strong> {resolution.resolution.metric_value}</p>
-            <p><strong>Payout:</strong> {resolution.resolution.payout_kx} KX</p>
-            <p><strong>Resolved At:</strong> {new Date(resolution.resolution.resolved_at).toLocaleString()}</p>
-            <p><strong>Evidence Hash:</strong> <code style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{resolution.resolution.evidence_hash}</code></p>
-            <p><strong>Payload Hash:</strong> <code style={{ fontSize: '0.85rem', wordBreak: 'break-all' }}>{resolution.resolution.payload_hash}</code></p>
+        <div className="mt-8 space-y-6">
+          <div className="bg-white rounded-warm-lg shadow-warm p-8 border border-cream-300">
+            <h3 className="font-display text-2xl font-semibold text-ink-900 mb-6">
+              Resolution Record
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Grant ID</p>
+                <p className="text-ink-900 font-mono">{resolution.grant_id}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Payout</p>
+                <p className="text-ink-900 font-semibold text-lg">{resolution.resolution.payout_kx} KX</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Window</p>
+                <p className="text-ink-900">{resolution.resolution.window}</p>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-ink-700 mb-1">Metric Value</p>
+                <p className="text-ink-900">{resolution.resolution.metric_value}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-ink-700 mb-1">Resolved At</p>
+                <p className="text-ink-900">{new Date(resolution.resolution.resolved_at).toLocaleString()}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-ink-700 mb-1">Evidence Hash</p>
+                <code className="text-xs text-ink-600 bg-cream-200 px-2 py-1 rounded break-all block">
+                  {resolution.resolution.evidence_hash}
+                </code>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-semibold text-ink-700 mb-1">Payload Hash</p>
+                <code className="text-xs text-ink-600 bg-cream-200 px-2 py-1 rounded break-all block">
+                  {resolution.resolution.payload_hash}
+                </code>
+              </div>
+            </div>
           </div>
 
           {parseFloat(resolution.resolution.payout_kx) > 0 && (
@@ -175,27 +195,25 @@ function StatusPageContent() {
           )}
 
           {parseFloat(resolution.resolution.payout_kx) === 0 && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '1rem',
-              backgroundColor: '#fef3c7',
-              borderRadius: '4px',
-              border: '1px solid #fbbf24'
-            }}>
-              <p style={{ margin: 0, color: '#92400e' }}>
+            <div className="p-4 bg-amber-50 border border-amber-300 rounded-warm">
+              <p className="text-amber-900 font-semibold">
                 ⚠️ Zero payout - no settlement action required
               </p>
             </div>
           )}
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
 export default function StatusPage() {
   return (
-    <Suspense fallback={<main><h2>Loading...</h2></main>}>
+    <Suspense fallback={
+      <div className="max-w-4xl mx-auto">
+        <h2 className="font-display text-3xl font-semibold text-ink-900">Loading...</h2>
+      </div>
+    }>
       <StatusPageContent />
     </Suspense>
   );

@@ -68,47 +68,33 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
   const domain = url.hostname;
 
   return (
-    <section
-      style={{
-        marginTop: '2rem',
-        padding: '1.5rem',
-        border: '1px solid #e0e0e0',
-        borderRadius: '8px',
-        backgroundColor: '#fafafa',
-      }}
-    >
-      <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Cash out KX → USDC via XChan</h3>
+    <section className="bg-white rounded-warm-lg shadow-warm p-8 border border-cream-300">
+      <h3 className="font-display text-2xl font-semibold text-ink-900 mb-4">
+        Cash out KX → USDC via XChan
+      </h3>
 
       {kxAmount && kxAmount > 0 && (
-        <div
-          style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            backgroundColor: '#f0f9ff',
-            border: '1px solid #bfdbfe',
-            borderRadius: '6px',
-          }}
-        >
-          <div style={{ fontSize: '0.9rem', color: '#666', marginBottom: '0.25rem' }}>
+        <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-cream-100 rounded-warm border border-blue-200">
+          <div className="text-sm text-ink-700 mb-1">
             {kxAmount.toLocaleString()} KX
           </div>
           {loading ? (
-            <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#999' }}>
+            <div className="text-xl font-semibold text-ink-500">
               Loading quote...
             </div>
           ) : quote ? (
             <>
               {trustXchanPrice && quote.hasProvenance ? (
                 <>
-                  <div style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0369a1' }}>
+                  <div className="text-2xl font-bold text-blue-700">
                     ≈ ${quote.usdc.toFixed(2)} USDC
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                  <div className="text-xs text-ink-500 mt-1">
                     Rate: 1 KX = ${quote.rate!.toFixed(5)} • {new Date(quote.asOf!).toLocaleTimeString()}
                   </div>
                 </>
               ) : (
-                <div style={{ fontSize: '0.9rem', color: '#666', fontStyle: 'italic' }}>
+                <div className="text-sm text-ink-600 italic">
                   USDC estimate pending verified rate
                 </div>
               )}
@@ -117,46 +103,32 @@ export function XChanCashOut({ kxAmount }: XChanCashOutProps) {
         </div>
       )}
 
-      <p style={{ fontSize: '0.95rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
-        Promises settle natively in KX. XChan converts KX to USDC <strong>on the Base network</strong>.
-      </p>
+      <div className="space-y-4 mb-6">
+        <p className="text-ink-700 leading-relaxed">
+          Promises settle natively in KX. XChan converts KX to USDC <strong>on the Base network</strong>.
+        </p>
 
-      <p style={{ fontSize: '0.95rem', lineHeight: 1.6, margin: '0.5rem 0' }}>
-        <strong>USDC from XChan arrives on Base. Escrow payouts use Arbitrum. These are different networks — always match your wallet's network to the payout source.</strong>
-      </p>
-
-      <div
-        style={{
-          marginTop: '1.25rem',
-          padding: '0.75rem',
-          backgroundColor: '#fff3cd',
-          border: '1px solid #ffc107',
-          borderRadius: '4px',
-          fontSize: '0.85rem',
-          color: '#856404',
-        }}
-      >
-        ⚠️ You are leaving this site — XChan is a separate service
+        <p className="text-ink-700 leading-relaxed">
+          <strong>USDC from XChan arrives on Base. Escrow payouts use Arbitrum. These are different networks — always match your wallet's network to the payout source.</strong>
+        </p>
       </div>
 
-      <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+      <div className="p-4 bg-amber-50 border border-amber-300 rounded-warm mb-6">
+        <p className="text-amber-900 text-sm">
+          ⚠️ You are leaving this site — XChan is a separate service
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4 flex-wrap">
         <a
           href={xchanUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            display: 'inline-block',
-            padding: '0.75rem 1.5rem',
-            backgroundColor: '#0070f3',
-            color: 'white',
-            textDecoration: 'none',
-            borderRadius: '4px',
-            fontWeight: 500,
-          }}
+          className="inline-block px-6 py-3 bg-warmAccent-500 text-white font-medium rounded-warm hover:bg-warmAccent-600 transition-colors"
         >
           Go to XChan
         </a>
-        <span style={{ fontSize: '0.85rem', color: '#666' }}>
+        <span className="text-sm text-ink-600">
           {domain}
         </span>
       </div>
