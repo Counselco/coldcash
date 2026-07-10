@@ -164,13 +164,19 @@ def upload_directory(ftp, local_root):
     uploaded_files = 0
     uploaded_bytes = 0
 
-    # Try to cwd into public_html if it exists; ignore if we're already there or it's the root
-    try:
-        ftp.cwd('public_html')
-        print(f"✓ Changed to public_html directory")
-    except ftplib.error_perm:
-        # Either already in public_html or it doesn't exist - proceed with current directory
-        print(f"✓ Using current directory (may already be in public_html)")
+    # Descend into public_html ONLY if we're not already at the docroot.
+    # This Hostinger account's FTP home IS /public_html; a blind cwd('public_html')
+    # drops uploads into an unserved /public_html/public_html/ nested directory.
+    cur = ftp.pwd().rstrip('/')
+    if cur.rsplit('/', 1)[-1] == 'public_html':
+        print(f"✓ Already at docroot ({cur}) — not descending into public_html")
+    else:
+        try:
+            ftp.cwd('public_html')
+            print(f"✓ Changed to public_html directory")
+        except ftplib.error_perm:
+            # Either already in public_html or it doesn't exist - proceed with current directory
+            print(f"✓ Using current directory (may already be in public_html)")
 
     # Delete known placeholders
     for placeholder in PLACEHOLDERS:

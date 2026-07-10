@@ -36,15 +36,15 @@ export default function RootLayout({
               {BRAND.name}
             </Link>
             <div className="flex gap-6 text-sm">
-              <Link href="/backer" className="text-ink-700 hover:text-warmAccent-500 transition-colors font-medium">
-                Back a Goal
-              </Link>
-              <Link href="/seeker" className="text-ink-700 hover:text-warmAccent-500 transition-colors font-medium">
-                Earn a Payout
+              <Link href="/first-six/dashboard" className="text-ink-700 hover:text-warmAccent-500 transition-colors font-medium">
+                Dashboard
               </Link>
               <Link href="/status" className="text-ink-700 hover:text-warmAccent-500 transition-colors font-medium">
                 Status
               </Link>
+              <a href="https://github.com/uponproof/coldcash/blob/main/docs/FIRST-SIX-PROGRAM.md" target="_blank" rel="noopener noreferrer" className="text-ink-700 hover:text-warmAccent-500 transition-colors font-medium">
+                Program Law
+              </a>
             </div>
           </div>
         </nav>
