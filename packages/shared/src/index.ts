@@ -7,3 +7,4 @@ export * from "./hash.js";
 export * from "./deployments.js";
 export * from "./xchan.js";
 export * from "./chronx.js";
+export * from "./first-six.js";
