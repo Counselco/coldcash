@@ -1,21 +1,29 @@
 /**
  * ChronX Records Backend - On-Chain Implementation
  *
- * This replaces the records-first stub with genuine chain transactions for Type_G grants.
+ * ARCHITECTURE: WRITES-THROUGH-WALLET / READS-THROUGH-RPC
+ *
+ * WRITES (GrantCreate, GrantArm, GrantClose, GrantEvaluate):
+ * - TypeScript constructs the grant INTENT (action + parameters as structured data)
+ * - Shells out to chronx-wallet binary which:
+ *   - Signs with Dilithium2
+ *   - Computes PoW
+ *   - Builds bincode body
+ *   - Submits via node
+ * - TypeScript gets back a TxId
+ * - TypeScript does NOT sign, does NOT PoW, does NOT construct bincode
+ *
+ * READS (dashboard/status):
+ * - JSON-RPC calls to chronx_getAuthorityGrants, chronx_getAccount, chronx_getDagTips
+ * - Unchanged from previous implementation
  *
  * SAFETY INTERLOCK:
- * - ALL live RPC submission is gated behind CHRONX_LIVE_SUBMIT env flag (default: false)
- * - When disabled: transactions are constructed, signed, validated, and logged but NOT submitted
- * - This gate is implemented in ChronxRpcClient.sendTransaction()
- *
- * IMPORTANT:
- * The ChronX chain is freshly genesis'd with an EMPTY DAG. The FIRST real transaction
- * permanently retires the rollback window (to checkpoint b629e31f). This must be a
- * conscious operator act, NEVER a side effect of a build or test.
- *
- * Flipping CHRONX_LIVE_SUBMIT=true is an operator decision made ONLY after:
- * 1. The rollback window is consciously retired
- * 2. The first probe tx is sent by hand
+ * - ALL live wallet submission is gated behind CHRONX_LIVE_SUBMIT env flag (default: false)
+ * - When disabled: wallet command constructed and logged but NOT executed
+ * - The first real tx permanently retires the rollback window (to checkpoint b629e31f)
+ * - Flipping CHRONX_LIVE_SUBMIT=true is an operator decision made ONLY after:
+ *   1. The rollback window is consciously retired
+ *   2. The first probe tx is sent by hand
  */
 
 import type {
@@ -28,20 +36,23 @@ import type {
   Hex,
 } from "@coldcash/shared";
 import { ChronxRpcClient, MockChronxRpcClient } from "../chronx/rpc-client.js";
-import { buildTransaction, generateGrantId } from "../chronx/tx-builder.js";
-import type {
-  GrantCreateAction,
-  GrantArmAction,
-  GrantCloseAction,
-} from "../chronx/types.js";
+import { generateGrantId } from "../chronx/tx-builder.js";
+import {
+  ChronxWalletClient,
+  type GrantIntent,
+  type GrantCreateIntent,
+  type GrantArmIntent,
+  type GrantCloseIntent,
+} from "../chronx/wallet-client.js";
 
 export interface ChronxRecordsBackendConfig {
   rpcUrl: string;  // ChronX RPC endpoint (e.g., via Tailscale)
   grantorWallet: string;  // Upon Proof company wallet (base58 address)
-  grantorPrivateKey: string | null;  // Dilithium2 private key (null for mock mode)
   grantorLegalIdentity: string;  // e.g., "Upon Proof LLC, Delaware"
   witnessIdentity: string;  // Witness seat for Class B metrics
-  mock?: boolean;  // Use mock RPC client (for testing)
+  walletBinPath?: string;  // Path to chronx-wallet binary (default: from env CHRONX_WALLET_BIN)
+  keyfilePath?: string;  // Path to keyfile (default: from env CHRONX_KEYFILE)
+  mock?: boolean;  // Use mock wallet client (for testing)
 }
 
 /**
@@ -50,10 +61,10 @@ export interface ChronxRecordsBackendConfig {
  * Implements SettlementBackend interface with real ChronX transactions.
  *
  * Transaction lifecycle:
- * 1. createPromise() → GrantCreate + GrantArm (debits pool from grantor)
- * 2. accept() → GrantAccept (binds grantee)
- * 3. resolve() → GrantEvaluate (permissionless, releases payout per curve)
- * 4. cancel/refund() → GrantClose (reverts unreleased pool to grantor)
+ * 1. createPromise() → GrantCreate + GrantArm (wallet signs + submits)
+ * 2. accept() → GrantAccept (wallet signs + submits)
+ * 3. resolve() → GrantEvaluate (wallet signs + submits, permissionless)
+ * 4. cancel/refund() → GrantClose (wallet signs + submits)
  *
  * NOTE: Class A metrics are currently STUBBED at node level (return 0).
  * Grants ARM and lock funds but won't auto-release until J3 metric work lands.
@@ -62,12 +73,30 @@ export interface ChronxRecordsBackendConfig {
 export class ChronxRecordsBackend implements SettlementBackend {
   private config: ChronxRecordsBackendConfig;
   private rpc: ChronxRpcClient;
+  private wallet: ChronxWalletClient | null;
 
   constructor(config: ChronxRecordsBackendConfig) {
     this.config = config;
     this.rpc = config.mock
       ? new MockChronxRpcClient()
       : new ChronxRpcClient({ rpcUrl: config.rpcUrl });
+
+    // Initialize wallet client (null in mock mode)
+    if (config.mock) {
+      this.wallet = null;
+    } else {
+      const walletBinPath = config.walletBinPath || process.env.CHRONX_WALLET_BIN || "chronx-wallet";
+      const keyfilePath = config.keyfilePath || process.env.CHRONX_KEYFILE;
+
+      if (!keyfilePath) {
+        throw new Error("CHRONX_KEYFILE environment variable or config.keyfilePath is required");
+      }
+
+      this.wallet = new ChronxWalletClient({
+        walletBinPath,
+        keyfilePath,
+      });
+    }
   }
 
   /**
@@ -77,17 +106,18 @@ export class ChronxRecordsBackend implements SettlementBackend {
    * 1. GrantCreate action (defines grant parameters)
    * 2. GrantArm action (debits pool_kx from grantor, seals schedule, moves to ACTIVE)
    *
+   * WRITES-THROUGH-WALLET: Constructs grant INTENT, shells out to chronx-wallet binary
+   * for signing + PoW + bincode + submission. TypeScript does NOT sign.
+   *
    * @param params - Promise parameters (from intake)
    * @returns Promise reference (grant_id as address)
    */
   async createPromise(params: PromiseParams): Promise<PromiseRef> {
-    // Get current account state for nonce
+    // Get current account state for nonce (used for grant_id derivation)
     const account = await this.rpc.getAccount({ address: this.config.grantorWallet });
 
-    // Get DAG tips for parent selection
-    const dagTips = await this.rpc.getDagTips({ count: 8 });
-
     // Generate grant ID
+    // PENDING-SIGNING-SPEC: If SIGNING.md says wallet generates grant_id, call wallet for this too
     const timestamp = Math.floor(Date.now() / 1000);
     const grant_id = generateGrantId(
       this.config.grantorWallet,
@@ -96,9 +126,8 @@ export class ChronxRecordsBackend implements SettlementBackend {
       account.nonce + 1
     );
 
-    // Build GrantCreate action
-    const createAction: GrantCreateAction = {
-      type: "GrantCreate",
+    // Build GrantCreate intent
+    const createIntent: GrantCreateIntent = {
       grant_id,
       grantor_legal_identity: this.config.grantorLegalIdentity,
       grantee_seat: params.namedSeeker || null,
@@ -124,24 +153,39 @@ export class ChronxRecordsBackend implements SettlementBackend {
       unearned_rollover: false,
     };
 
-    // Build GrantArm action
-    const armAction: GrantArmAction = {
-      type: "GrantArm",
+    // Build GrantArm intent
+    const armIntent: GrantArmIntent = {
       grant_id,
     };
 
-    // Build and submit transaction (gated by CHRONX_LIVE_SUBMIT)
-    const tx = await buildTransaction(
-      this.config.grantorWallet,
-      [createAction, armAction],
-      dagTips,
-      account,
-      this.config.grantorPrivateKey
-    );
+    // Submit via wallet binary (or mock in test mode)
+    const intents: GrantIntent[] = [
+      { type: "GrantCreate", intent: createIntent },
+      { type: "GrantArm", intent: armIntent },
+    ];
 
-    const result = await this.rpc.sendTransaction(tx);
+    let tx_id: string;
+    if (this.config.mock) {
+      // Mock mode: simulate wallet response and register grant in mock RPC for status queries
+      tx_id = "0x" + Buffer.from(grant_id).toString("hex").slice(0, 64).padEnd(64, "0");
+      console.log(`[MOCK] Grant created: ${grant_id} (tx: ${tx_id})`);
 
-    console.log(`Grant created: ${grant_id} (tx: ${result.tx_hash})`);
+      // Register grant in mock RPC client so status() can query it
+      if (this.rpc instanceof MockChronxRpcClient) {
+        this.rpc.registerMockGrant(
+          grant_id,
+          this.config.grantorWallet,
+          params.namedSeeker || null,
+          params.prize.toString(),
+          "ACTIVE"  // GrantCreate + GrantArm → ACTIVE
+        );
+      }
+    } else {
+      // Live mode: shell out to wallet binary (gated by CHRONX_LIVE_SUBMIT)
+      const result = await this.wallet!.submitGrantActions(intents);
+      tx_id = result.tx_id;
+      console.log(`Grant created: ${grant_id} (tx: ${tx_id}, submitted: ${result.submitted})`);
+    }
 
     return {
       chainId: 0,  // ChronX chain ID (TBD)
@@ -168,38 +212,35 @@ export class ChronxRecordsBackend implements SettlementBackend {
    *
    * Maps to: GrantAccept action
    *
-   * NOTE: This implementation assumes the grantee signs the transaction.
-   * In a real system, this would require the grantee's private key.
-   * For now, we use the grantor's key (mock mode).
+   * NOTE: In production, this would be signed by the grantee's wallet.
+   * For now, we use the grantor's wallet (mock/test mode).
    */
   async accept(ref: PromiseRef, seeker: Address): Promise<TxRef> {
     const grant_id = ref.address;
 
-    // Get account state
-    const account = await this.rpc.getAccount({ address: this.config.grantorWallet });
-    const dagTips = await this.rpc.getDagTips({ count: 8 });
+    const intents: GrantIntent[] = [
+      {
+        type: "GrantAccept",
+        intent: {
+          grant_id,
+          accepting_seat: seeker,
+        },
+      },
+    ];
 
-    // In a real system, this would be signed by the grantee
-    // For now, use grantor wallet (mock/test mode)
-    const acceptAction = {
-      type: "GrantAccept" as const,
-      grant_id,
-      accepting_seat: seeker,
-    };
-
-    const tx = await buildTransaction(
-      this.config.grantorWallet,  // Should be grantee wallet
-      [acceptAction],
-      dagTips,
-      account,
-      this.config.grantorPrivateKey
-    );
-
-    const result = await this.rpc.sendTransaction(tx);
+    let tx_id: string;
+    if (this.config.mock) {
+      // Mock mode: simulate wallet response
+      tx_id = "0x" + Buffer.from(grant_id + "accept").toString("hex").slice(0, 64).padEnd(64, "0");
+    } else {
+      // Live mode: shell out to wallet binary
+      const result = await this.wallet!.submitGrantActions(intents);
+      tx_id = result.tx_id;
+    }
 
     return {
       chainId: 0,
-      hash: result.tx_hash as Hex,
+      hash: tx_id as Hex,
     };
   }
 
@@ -218,30 +259,29 @@ export class ChronxRecordsBackend implements SettlementBackend {
   async resolve(ref: PromiseRef, bps: number, evidenceHash: Hex): Promise<TxRef> {
     const grant_id = ref.address;
 
-    // Get account state
-    const account = await this.rpc.getAccount({ address: this.config.grantorWallet });
-    const dagTips = await this.rpc.getDagTips({ count: 8 });
+    const intents: GrantIntent[] = [
+      {
+        type: "GrantEvaluate",
+        intent: {
+          grant_id,
+          window_index: 0,  // First window (Type_G v1 is single-window)
+        },
+      },
+    ];
 
-    // GrantEvaluate is permissionless - any wallet can submit
-    const evaluateAction = {
-      type: "GrantEvaluate" as const,
-      grant_id,
-      window_index: 0,  // First window (Type_G v1 is single-window)
-    };
-
-    const tx = await buildTransaction(
-      this.config.grantorWallet,
-      [evaluateAction],
-      dagTips,
-      account,
-      this.config.grantorPrivateKey
-    );
-
-    const result = await this.rpc.sendTransaction(tx);
+    let tx_id: string;
+    if (this.config.mock) {
+      // Mock mode: simulate wallet response
+      tx_id = "0x" + Buffer.from(grant_id + "evaluate").toString("hex").slice(0, 64).padEnd(64, "0");
+    } else {
+      // Live mode: shell out to wallet binary
+      const result = await this.wallet!.submitGrantActions(intents);
+      tx_id = result.tx_id;
+    }
 
     return {
       chainId: 0,
-      hash: result.tx_hash as Hex,
+      hash: tx_id as Hex,
     };
   }
 
@@ -316,28 +356,26 @@ export class ChronxRecordsBackend implements SettlementBackend {
   private async closeGrant(ref: PromiseRef): Promise<TxRef> {
     const grant_id = ref.address;
 
-    // Get account state
-    const account = await this.rpc.getAccount({ address: this.config.grantorWallet });
-    const dagTips = await this.rpc.getDagTips({ count: 8 });
+    const intents: GrantIntent[] = [
+      {
+        type: "GrantClose",
+        intent: { grant_id },
+      },
+    ];
 
-    const closeAction: GrantCloseAction = {
-      type: "GrantClose",
-      grant_id,
-    };
-
-    const tx = await buildTransaction(
-      this.config.grantorWallet,
-      [closeAction],
-      dagTips,
-      account,
-      this.config.grantorPrivateKey
-    );
-
-    const result = await this.rpc.sendTransaction(tx);
+    let tx_id: string;
+    if (this.config.mock) {
+      // Mock mode: simulate wallet response
+      tx_id = "0x" + Buffer.from(grant_id + "close").toString("hex").slice(0, 64).padEnd(64, "0");
+    } else {
+      // Live mode: shell out to wallet binary
+      const result = await this.wallet!.submitGrantActions(intents);
+      tx_id = result.tx_id;
+    }
 
     return {
       chainId: 0,
-      hash: result.tx_hash as Hex,
+      hash: tx_id as Hex,
     };
   }
 }

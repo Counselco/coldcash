@@ -266,4 +266,21 @@ export class MockChronxRpcClient extends ChronxRpcClient {
     );
     return { grants };
   }
+
+  /**
+   * Register a grant in the mock store (for testing without sendTransaction)
+   *
+   * Used by ChronxRecordsBackend in mock mode to register grants so they can be queried.
+   */
+  registerMockGrant(grant_id: string, grantor_seat: string, grantee_seat: string | null, pool_kx: string, status: string = "ACTIVE"): void {
+    this.mockGrants.set(grant_id, {
+      grant_id,
+      status,
+      grantor_seat,
+      grantee_seat,
+      pool_kx,
+      cumulative_released_kx: "0",
+      created_at: Math.floor(Date.now() / 1000),
+    });
+  }
 }
