@@ -206,8 +206,8 @@ export class ClaimProcessor {
    * Lazy-arm grant for a seat
    *
    * Creates and arms a Type_G grant with:
-   * - $20/month × 5 windows
-   * - Linear payout curve (100% uptime → $20, <80% → $0)
+   * - $10/month × 12 windows
+   * - Linear payout curve (100% uptime → $10, <80% → $0)
    * - unearned_rollover = false (below-floor reverts to treasury)
    * - Grantor: Upon Proof company wallet dD8X...
    * - Metric spec: anti-fraud standard frozen in
@@ -228,18 +228,18 @@ export class ClaimProcessor {
     );
 
     // Build GrantCreate intent
-    // $20/month × 5 months = $100 per seat
+    // $10/month × 12 months = $120 per seat
     // Convert to KX: for now, use 1 KX = $0.01 (mock rate)
     // In production, this would query XChan oracle (gated by COLDCASH_TRUST_XCHAN_PRICE)
     const MOCK_KX_TO_USD = 0.01;
     const poolKx = Math.ceil(FIRST_SIX_MONTHLY_CAP_USD * FIRST_SIX_WINDOW_COUNT / MOCK_KX_TO_USD);
 
-    // Window spec: 5 windows, each 30 days (approx 1 month)
+    // Window spec: 12 windows, each 30 days (approx 1 month)
     const windowLenSec = 30 * 24 * 60 * 60;
     const expiryTs = timestamp + windowLenSec * FIRST_SIX_WINDOW_COUNT;
 
     // Payout curve: linear from 80% floor to 100%
-    // Steps: [[0.8, 16], [1.0, 20]] means 80% uptime → $16, 100% uptime → $20
+    // Steps: [[0.8, 8], [1.0, 10]] means 80% uptime → $8, 100% uptime → $10
     // Below 80% → $0 (threshold enforcement in metric evaluation)
     const createIntent: GrantCreateIntent = {
       grant_id: grantId,
@@ -257,8 +257,8 @@ export class ClaimProcessor {
       payout_curve: {
         type: "stepped",
         steps: [
-          [0.8, 16],   // 80% floor → $16 (below this → $0 via threshold)
-          [1.0, 20],   // 100% → $20
+          [0.8, 8],   // 80% floor → $8 (below this → $0 via threshold)
+          [1.0, 10],   // 100% → $10
         ],
       },
       window_spec: {

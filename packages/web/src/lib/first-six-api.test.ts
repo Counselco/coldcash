@@ -95,10 +95,10 @@ describe('FirstSixApiClient', () => {
     it('exports correct program constants', () => {
       expect(FIRST_SIX_CONSTANTS.GRANTOR).toBe('dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ');
       expect(FIRST_SIX_CONSTANTS.SEAT_COUNT).toBe(6);
-      expect(FIRST_SIX_CONSTANTS.MONTHLY_CAP_USD).toBe(20);
-      expect(FIRST_SIX_CONSTANTS.WINDOW_COUNT).toBe(5);
-      expect(FIRST_SIX_CONSTANTS.SEAT_CAP_USD).toBe(100);
-      expect(FIRST_SIX_CONSTANTS.PROGRAM_CAP_USD).toBe(600);
+      expect(FIRST_SIX_CONSTANTS.MONTHLY_CAP_USD).toBe(10);
+      expect(FIRST_SIX_CONSTANTS.WINDOW_COUNT).toBe(12);
+      expect(FIRST_SIX_CONSTANTS.SEAT_CAP_USD).toBe(120);
+      expect(FIRST_SIX_CONSTANTS.PROGRAM_CAP_USD).toBe(720);
       expect(FIRST_SIX_CONSTANTS.UPTIME_FLOOR).toBe(80);
     });
   });

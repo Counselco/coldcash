@@ -93,10 +93,10 @@ export interface ChronXRpcResponse {
  * Linear payout curve with floor
  *
  * Per program law (FIRST-SIX-PROGRAM.md):
- * - Full payout ($20) at 100% uptime
+ * - Full payout ($10) at 100% uptime
  * - Proportional payout between floor and 100%
  * - $0 payout below 80% floor
- * - Formula: payout_usd = min(20.00, (uptime_pct / 100) × 20.00)
+ * - Formula: payout_usd = min(10.00, (uptime_pct / 100) × 10.00)
  * - Floor: uptime_pct < 80 → $0
  */
 export const UPTIME_FLOOR_PERCENT = 80;
@@ -107,7 +107,7 @@ export function calculatePayoutUsd(uptimePercent: number): number {
     return 0;
   }
 
-  // Linear curve: (uptime / 100) × $20, capped at $20
+  // Linear curve: (uptime / 100) × $10, capped at $10
   const payout = (uptimePercent / 100) * FIRST_SIX_MONTHLY_CAP_USD;
   return Math.min(payout, FIRST_SIX_MONTHLY_CAP_USD);
 }

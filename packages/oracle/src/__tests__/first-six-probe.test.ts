@@ -13,20 +13,20 @@ import { keccak256, encodePacked, type Hex } from "viem";
 
 describe("First Six Probe Attestor", () => {
   describe("calculatePayoutUsd", () => {
-    it("100% uptime → $20", () => {
-      expect(calculatePayoutUsd(100)).toBe(20);
+    it("100% uptime → $10", () => {
+      expect(calculatePayoutUsd(100)).toBe(10);
     });
 
-    it("90% uptime → $18", () => {
-      expect(calculatePayoutUsd(90)).toBe(18);
+    it("90% uptime → $9", () => {
+      expect(calculatePayoutUsd(90)).toBe(9);
     });
 
-    it("85% uptime → $17", () => {
-      expect(calculatePayoutUsd(85)).toBe(17);
+    it("85% uptime → $8.50", () => {
+      expect(calculatePayoutUsd(85)).toBe(8.5);
     });
 
-    it("80% uptime (at floor) → $16", () => {
-      expect(calculatePayoutUsd(80)).toBe(16);
+    it("80% uptime (at floor) → $8", () => {
+      expect(calculatePayoutUsd(80)).toBe(8);
     });
 
     it("79% uptime (below floor) → $0", () => {
@@ -41,9 +41,9 @@ describe("First Six Probe Attestor", () => {
       expect(calculatePayoutUsd(0)).toBe(0);
     });
 
-    it("uptime capped at $20 (no over-payout)", () => {
-      // Even if somehow uptime > 100%, cap at $20
-      expect(calculatePayoutUsd(150)).toBe(20);
+    it("uptime capped at $10 (no over-payout)", () => {
+      // Even if somehow uptime > 100%, cap at $10
+      expect(calculatePayoutUsd(150)).toBe(10);
     });
 
     it("floor constant is 80%", () => {
@@ -51,8 +51,8 @@ describe("First Six Probe Attestor", () => {
     });
 
     it("partial month: 28 days, 85% uptime", () => {
-      // 85% uptime = $17 (linear curve applies regardless of month length)
-      expect(calculatePayoutUsd(85)).toBe(17);
+      // 85% uptime = $8.50 (linear curve applies regardless of month length)
+      expect(calculatePayoutUsd(85)).toBe(8.5);
     });
   });
 
@@ -163,7 +163,7 @@ describe("First Six Probe Attestor", () => {
       expect(metric.metricValueUsd).toBe(0);
     });
 
-    it("all successful probes → 100% uptime, $20", () => {
+    it("all successful probes → 100% uptime, $10", () => {
       const log: ObservationLog = {
         grant_id: "grant-001",
         window: 1,
@@ -192,7 +192,7 @@ describe("First Six Probe Attestor", () => {
       expect(metric.totalProbes).toBe(2);
       expect(metric.successfulProbes).toBe(2);
       expect(metric.uptimePercent).toBe(100);
-      expect(metric.metricValueUsd).toBe(20);
+      expect(metric.metricValueUsd).toBe(10);
     });
 
     it("partial uptime → proportional payout", () => {
@@ -260,7 +260,7 @@ describe("First Six Probe Attestor", () => {
       expect(metric.totalProbes).toBe(5);
       expect(metric.successfulProbes).toBe(4);
       expect(metric.uptimePercent).toBe(80); // 4/5 = 80%
-      expect(metric.metricValueUsd).toBe(16); // 80% of $20 = $16
+      expect(metric.metricValueUsd).toBe(8); // 80% of $10 = $8
     });
   });
 
@@ -281,7 +281,7 @@ describe("First Six Probe Attestor", () => {
 
       expect(metric.grant_id).toBe("grant-001");
       expect(metric.window).toBe(1);
-      expect(metric.metric_value).toBe(20); // 100% uptime
+      expect(metric.metric_value).toBe(10); // 100% uptime
       expect(metric.uptime_percent).toBe(100);
       expect(metric.evidence_hash).toMatch(/^0x[0-9a-f]{64}$/);
       expect(metric.source).toBe("probe-attested");
@@ -429,7 +429,7 @@ describe("First Six Probe Attestor", () => {
       const metric = aggregateObservations(log);
 
       expect(metric.uptimePercent).toBe(100);
-      expect(metric.metricValueUsd).toBe(20);
+      expect(metric.metricValueUsd).toBe(10);
     });
 
     it("partial month below floor → $0", () => {

@@ -10,9 +10,11 @@
 
 ## Executive Summary
 
-The First Six Program is Upon Proof's flagship payment rail for ChronX node operators. It pays the first 6 qualifying node operators up to $20/month for 5 months each, subject to monthly uptime requirements. Total program cap: $600 ($100 per operator × 6 seats).
+The First Six Program is Upon Proof's flagship payment rail for ChronX node operators. It pays the first 6 qualifying node operators up to $10/month for 12 months each, subject to monthly uptime requirements. Total program cap: $720 ($120 per operator × 6 seats).
 
 This document is the **complete program law** — the canonical specification for all technical implementation, UI rendering, and operational decisions.
+
+**CHANGELOG (2026-07-13):** Per-operator payment terms updated from $20/month × 5 months to $10/month × 12 months. This supersedes the prior $20×5 ruling. Per-seat cap increases from $100 to $120, program cap from $600 to $720. Payout curve and floor behavior unchanged (linear from 80% floor).
 
 ---
 
@@ -21,8 +23,8 @@ This document is the **complete program law** — the canonical specification fo
 **Eligibility:** ChronX node operators running real, reachable nodes serving RPC traffic.
 
 **Compensation:**
-- **Per-seat cap:** Up to $20/month for 5 months = $100/operator maximum
-- **Program cap:** 6 seats × $100 = $600 total maximum payout across all operators
+- **Per-seat cap:** Up to $10/month for 12 months = $120/operator maximum
+- **Program cap:** 6 seats × $120 = $720 total maximum payout across all operators
 
 **Grantor:** Upon Proof company wallet `dD8XBABN2nu66tnL25XYGXATYTNdgQQjLhf2VZtuLeZ` escrows and disburses all payments.
 
@@ -33,7 +35,7 @@ This document is the **complete program law** — the canonical specification fo
 2. Operator claims seat (first-come-first-served, DAG commit order)
 3. Grant arms for that operator only (escrow snaps shut per-seat)
 4. Monthly uptime measured, KX released on linear curve
-5. After 5 months OR voluntary exit, grant closes and seat is freed
+5. After 12 months OR voluntary exit, grant closes and seat is freed
 
 ---
 
@@ -90,7 +92,7 @@ This is not a flexible guideline — it is the immutable requirement. Attestor r
 ### Grant Arming (Lazy-ARM)
 
 Grants arm **per-seat at claim-time**, not in advance. When a claim succeeds:
-1. Escrow for that seat (up to $100 in KX) snaps shut from the program treasury
+1. Escrow for that seat (up to $120 in KX) snaps shut from the program treasury
 2. Grant transitions to ARMED state for that operator's address
 3. First payment window opens immediately
 
@@ -123,7 +125,7 @@ The `OracleAdapter` seam is documented to make this swap seamless — no operato
 
 **Formula:**
 ```
-payout_usd = min(20.00, (uptime_pct / 100) × 20.00)
+payout_usd = min(10.00, (uptime_pct / 100) × 10.00)
 ```
 
 **Floor behavior:**
@@ -131,12 +133,12 @@ payout_usd = min(20.00, (uptime_pct / 100) × 20.00)
 - **Unearned funds:** Revert to treasury (NOT rolled over to subsequent months)
 - **Rationale:** Operators must maintain >80% uptime to earn. Sporadic participation does not accumulate credit.
 
-**Cap enforcement:** No single month can pay more than $20 USD-equivalent. No operator can earn more than $100 total across 5 months.
+**Cap enforcement:** No single month can pay more than $10 USD-equivalent. No operator can earn more than $120 total across 12 months.
 
 **Example payouts (assuming 80% floor):**
-- 100% uptime → $20
-- 90% uptime → $18
-- 85% uptime → $17
+- 100% uptime → $10
+- 90% uptime → $9
+- 85% uptime → $8.50
 - 79% uptime → $0 (below floor, full reversion)
 
 ---
@@ -145,7 +147,7 @@ payout_usd = min(20.00, (uptime_pct / 100) × 20.00)
 
 ### USD-Denominated, KX-Settled
 
-**Display currency:** All amounts shown to users in USD ($20/month, $100 cap).
+**Display currency:** All amounts shown to users in USD ($10/month, $120 cap).
 
 **Settlement currency:** Payments settle in KX at the settlement-time rate.
 
@@ -187,7 +189,7 @@ payout_usd = min(20.00, (uptime_pct / 100) × 20.00)
 
 **4. Permanent Per-Window Receipts:**
 - Each monthly window stores: uptime %, KX released, evidence hash, TxId
-- Operator dashboard shows all 5 months' receipts (immutable audit trail)
+- Operator dashboard shows all 12 months' receipts (immutable audit trail)
 
 **5. Reversion Transparency:**
 - If a month pays $0 due to floor miss, display: "Window 3: 0 KX released (uptime 72%, below 80% floor)"

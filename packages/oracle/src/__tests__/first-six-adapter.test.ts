@@ -36,7 +36,7 @@ describe("First Six Oracle Adapter", () => {
       expect(metric).not.toBeNull();
       expect(metric!.grant_id).toBe("grant-001");
       expect(metric!.window).toBe(1);
-      expect(metric!.metric_value).toBe(20); // 100% uptime
+      expect(metric!.metric_value).toBe(10); // 100% uptime
       expect(metric!.uptime_percent).toBe(100);
       expect(metric!.source).toBe("probe-attested");
     });
